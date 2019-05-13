@@ -1,0 +1,918 @@
+         ,-----.      MMMMM      l
+   /\j__/\  (  \`--.    M   OOO  ll   º  N.  N
+   \`@_@'/  _)  >--.`.  M  O   O ll   I  N N N
+  _{.:Y:_}_{{_,'    ) ) m  O   O ll   Ii N  'n
+ {_}`-^{_} ```     (_/  M   OOO   lll Ii n   N  Versión Alfa.
+
+Modo de uso:
+   tolin [-iehsSOEHT] -f [path]file <-t [path]filemacro | 'script-macro'> [> file]
+
+   -i n        línea inicial de proceso.
+   -e n        línea final de proceso.
+   -h          esta ayuda.
+   -s          estadísticas del archivo. Sirve para saber si se podr  procesar con Tolin.
+               Esta opción anula todas las demás, excepto '-fb'.
+   -S n        número de líneas a saltar luego de procesada una línea (Skip o incremento).
+   -O          (Odd)  procesa solo líneas impares. Si el proceso inicia en una línea par, esta es omitida.
+   -E          (even) procesa líneas pares. Si el proceso inicia en una línea impar, esta es omitida.
+   -H n        procesa las 'n' primeras líneas del archivo. Similar a HEAD de Linux.
+   -T n        procesa las 'n' últimas líneas del archivo. Similar a TAIL de Linux.
+   -f          indica el archivo a procesar. Puede añadir una ruta.
+   -F          procesa un lote de archivos, indicados con comodines. Ejemplo: *.txt.
+   -t          indica un archivo de macros.
+   -b          fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que
+               contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13. Si tiene un archivo de datos
+               que no debería tener estos caracteres, use '-b' para forzar su proceso.
+ [-] 'script'  script de comandos que procesar n el archivo.
+               Use el guión '-' antes de 'script' si este viene a continuación del par metro '-F'.
+               Ejemplo:
+                    tolin -F *.txt - 'void at{"base"}?#;' -H 10  /* '-' necesario */
+                    tolin -F *.txt -H 10 'void at{"base"}?#;'    /* '-' no necesario */
+
+               Los comandos y funciones son los mismos que usa ED4XU, por lo que se puede consultar
+               su ayuda para más detalles.
+               EXCEPCION: el comando CLEAR, en Tolin, limpia el BUFFER. Además, los comandos SAVE y LOAD
+               no tienen uso con Tolin, y el comando FILE, que devuelve el nombre del archivo procesado,
+               no existe en ED4XU.
+
+  OBSERVACIONES.
+       Tolin carga y analiza el archivo de entrada antes de procesarlo con los comandos y funciones de
+       macros de Edit4Xu. No acepta ser parte del pipeline.
+       Como hace una carga inicial, es posible acceder a líneas que ya fueron procesadas, con LIN(n).
+       Otras observaciones son las siguientes:
+
+           * La salida del proceso ser  la consola, o un archivo, si redirige la salida con '>',
+           * Aparte, puede obtener una salida alternativa usando el BUFFER de Tolin. La función
+             COPY copia datos al BUFFER.
+           * El BUFFER es guardado al finalizar el proceso, en un archivo que tiene el mismo nombre
+             del archivo de proceso, más '.buffer'. Por ejemplo, si su archivo se llama 'datos.txt',
+             y usted usó el BUFFER para guardar datos, el archivo de salida del BUFFER ser :
+                     datos.txt.buffer
+           * Las opciones '-ie' son INCOMPATIBLES con '-HT'.
+           * La opción '-f' es INCOMPATIBLE con '-F'.
+           * Tolin no admite pipeline como datos de entrada. Debe usar '-f'.
+           * Por defecto, Tolin lee archivos UTF8 y US-ASCII, y no hace conversión de codepage.
+             Sin embargo, hace un esfuerzo. Intente '-s' para saber si su archivo puede ser procesado.
+
+  EJEMPLOS.
+        1) Si un archivo 'nuevo.txt' contiene un caracter anómalo (e.g. #1), el comando:
+
+                     tolin -f nuevo.txt -b 'void at{ch(1)}?#:tr{ch(1),""};'
+
+           podrá procesarlo, reemplazando #1 por nada. Debe usar '-b'.
+           El comando VOID indica que deben incluirse las líneas en blanco en el proceso.
+           La función TR reemplaza todo lo que encuentre en la línea.
+           La función AT devuelve la posición del primer match, sin importar si es una palabra completa
+           o es parte de otra. La función AF busca el match exacto y completo.
+
+        2) Si 'prog.c' tiene una codificación US-ASCII o ISO-8859xx, es posible que use #10 y #13
+           como salto de línea. Para eliminar #13, basta con hacer esto:
+
+                     tolin -f prog.c 'void #'
+
+        3) Suponga un programa Harbour donde se haya escrito en duro el caracter flecha (#16), en
+           muchas líneas. Para reparar eso, puede usar la siguiente línea:
+
+                     tolin -f clrsel.prg -b 'void at{ch(16)}?#:tr{("\""+ch(16)+"\""),"chr(16)"};'
+
+           Aparte de eliminar los #13 sobrantes (propio de codificación US-ASCII), busca el caracter
+           anómalo (AT); si no lo encuentra, libera la línea completa. Pero, si lo encuentra, reemplaza
+           el caracter "->", por "chr(16)", la función.
+           El caracter de escape '\"' se usa para que Tolin pueda reconocer comillas.
+
+        4) Para conocer la estadística de un grupo de archivos:
+
+                     tolin -F datos/*.csv -s
+
+        5) Para procesar un grupo de archivos. La salida ser  única, así como los datos almacenados en
+           el BUFFER con COPY:
+
+                     tolin -F datos/*.csv 'void match{"CTAAGH"}?:{I,{"  :  ",#}};'
+
+           Buscar  exactamente 'CTAAGH'; si lo encuentra, despliega la línea con el número de línea.
+           Si no lo encuentra, no hace nada (eso quiere decir '?:')
+
+  
+   ¿Qué hace Tolin?
+            Iterará cada línea indicada del archivo o los archivos, y será usada como argumento
+            de la expresión del script.
+   
+   Importante
+            Un resultado válido será extraído de la pila de operaciones. Si la pila
+            está vacía, no devolverá nada, pero si tiene más de un elemento, Tolin
+            arrojará error. Un ejemplo de esto último es el siguiente:
+            @1(5)
+            (#+@1)   ==> deja un resultado en la pila
+            (#-@1)   ==> no toma el elemento de la pila, sino que deja otro.
+            En este caso, Tolin arroja un error de "Expresión mal formada".
+            
+            Además, el analizador sintáctico de Tolin no es "Turing-decidible", por
+            la existencia de registros de memoria, y un par de funciones que no
+            dejan nada en la pila de operaciones. Sin embargo, una expresión sí
+            puede ser "Turing-decidible" si es una expresión bien formada.
+
+   Expresión bien formada
+            Una expresión "bien formada" es aquella que termina con un único
+            resultado en la pila de proceso.
+   
+   Ejemplo de expresión bien formada:
+            if(match{"código\;santiago"},up(tri(#)),nop)
+            
+            Si en la línea procesada existen las palabras "código" y "santiago",
+            quitará los espacios en blanco de la línea, y la convertirá en
+            mayúsculas; luego, la dejará en la pila. De lo contrario, dejará un
+            caracter nulo. Tolin detecta si en la pila no hay nada, y no altera
+            la fuente.
+   
+   Ejemplo de expresión no válida:
+            @1(5)
+
+            "5" es guardado en registro 1, pero no deja nada en la pila. 
+            Un resultado válido sería el siguiente:
+            @1(5)
+            @1    ==> esto, aunque parezca huevón, deja un resultado en la pila.
+            
+
+  NOCIONES DEL LENGUAJE DE MACROS DE TOLIN.
+
+   Operadores aritméticos: 
+   
+   +, -, *, /, \(div. entera), %(resto modulo), ^(potencia).
+
+   Números negativos:
+   
+            Deben ser escritos entre paréntesis.
+
+   NOTA: todas las funciones y atajos deben ser escritas con
+         minúsculas. Aquí las escribo con mayúscula porque soy
+         choro.
+
+   Comentarios:
+                     Acepta comentarios de bloque /* ... */
+
+
+   Sentencias de operación y configuración:
+   
+   NULL              Puesta al principio de la expresión, provoca que
+                     la iteración termine cuando encuentre una línea
+                     vacía.
+                     La línea vacía es útil cuando se intenta usar valores
+                     fuera del rango de los datos a operar, como si
+                     fuesen constantes. Sin embargo, cuando se procesan
+                     líneas de texto, no tiene sentido que la iteración
+                     termine ahí. Para eso sirve NULL. Ejemplo:
+                        null $1/tk(#(10),3)
+                     Dividirá los datos de la columna 1 por el tercer dato
+                     de la línea 10. La línea 10 debe estar después de una
+                     línea vacía.
+                     
+   I                 Variable que contiene el número de la línea que se
+                     está procesando.
+   
+   NT                Número total de tokens de la línea procesada. Su valor
+                     depende de DEFTOK o de la función DEFT(), descrita más
+                     adelante.
+
+   VOID              Indica a Tolin que si un resultado es vacío, lo añada a
+                     la pila de resultados. Sin este flag, los resultados
+                     vacíos no son considerados.
+   
+   NOP               Instrucción pedorra cuyo único objetivo es dejar un
+                     caracter nulo en la pila de resultados. Es muy útil
+                     para usarlo con IFxx(), porque, a veces, no se necesita
+                     un "ELSE". 
+
+   CLEAR             Elimina el contenido del BUFFER.
+
+
+   Registros de memoria.
+   
+                     Son variables. Existen 10 registros de memoria que
+                     pueden ser usados en una expresión, y creo que es
+                     mucho.
+                     Dichas memorias son inicializadas en cada ejecución,
+                     y pueden contener valores de distinto tipo en su
+                     ciclo de vida.
+
+   MOV(n,valor)      Mueve un valor al registro "n". Ejemplo:
+                     mov(2,100)
+                     mueve el valor 100 al registro 2
+
+      @n(valor)      Idem. Es más corto y elegante. Ejemplo:
+                     @2(100)
+
+   VAR(n)            Obtiene un valor de un registro "n". Ejemplo:
+                     var(2)
+                     obtiene el valor guardado en el registro 2.
+
+      @n             Idem.
+      
+      Importante     Los registros de memoria fueron incluido para solventar
+                     procesos complejos de edición; sin embargo, pueden ser
+                     mal usados, como por ejemplo, @n(v) no deja ningún 
+                     valor en la pila, y eso está mal. Se resuelve si se
+                     escribe: @n(v) @n.
+                     Los registros son solo temporales, no globales, se
+                     resetean con cada iteración.
+      
+      RECORDAR
+                     Tolin no procesa un grupo de expresiones: procesa una sola
+                     expresión, que puede tener "saltos" (como una función
+                     discontinua reparable), pero no debe indefinirse.
+                     Tolin puede aceptar saltos de línea para ordenar el código
+                     y para ayudar a la comprensión del mismo, pero al final
+                     procesará dicho código como una sola línea.
+
+
+
+   Estructura de Ciclo.
+
+   
+                     POOL/LOOP es una estructura de iteración. Pueden haber
+                     "pozos" anidados, aunque no se me ocurre para qué.
+
+   POOL              Entra al "pozo", al ciclo iterativo.
+
+   LOOP(n)           Vuelve al principio del ciclo, si "n" es distinto de 0.
+                     si "n" es 0, sale. Ejemplo:
+                     
+                     Se tiene en archivo:
+                     
+                     mensaje es total
+                     mensaje es total
+                     mensaje es total
+                     
+                     y se añade este valor al BUFFER mediante '-B 0':
+                     
+                     0
+                     
+                     Pruebe el siguiente código:
+                     
+                null                     /* termina en linea en blanco */
+                deft(" ")                /* define un tokenizer local */
+                @1(tri(#))               /* asigno tri(#) a registro 1 */
+                pool                     /* entra al pozo */
+                   let(1,(#1+1))         /* incremento de valor línea 1 */ 
+                   @2(tk(@1,#1))         /* dejo token #1 en registro 2 */ 
+                   @3( {{@3,"..."},@2} ) /* operacion generica, dejo en 3 */
+                loop(nt-#1)              /* total - token actual != 0 ? */
+                @3                       /* dejo registro 3 en pila */
+                let(1,0)                 /* dejo valor de línea 1 en 0 */
+                     
+                     Muestra:
+                     mensaje...es...total
+                     mensaje...es...total
+                     mensaje...es...total
+                
+                     NOTA: el recurso de la línea 1 como variable global de proceso
+                     estaba antes de la inclusión de los registros de memoria.
+
+
+   Sobrecarga de operadores.
+
+                     Algunos operadores aritméticos están sobrecargados con
+                     funciones especiales de proceso de cadenas. Estas son
+                     esas funciones:
+
+        Sean S, S1, S2 cadenas, y N un número.
+        
+        S1+S2        Idem a CAT(S1,S2), pero no es CAT.
+
+        S+N, N+S     Iden a PTRP(S,N)
+
+        S-N, N-S     Idem a PTRM(S,N). Ejemplo:
+                     #-(len(#)-rat{"//"})
+                     borra los comentarios de línea "//".
+                     
+        S1-S2        Elimina exactamente S2 desde S1. Ejemplo:
+                     "María tenía un corderito"-"tenía"
+                 ==> "María  un corderito"
+                     Funciona como la búsqueda de CTRL-NN de ED4XU, con la opción
+                     "full", y reemplazo por nada.
+
+        S*N, N*S     Idem a CP(S,N)
+
+        S1*S2        Mezcla S1 con S2. Ejemplo:
+                     "Hola!"*" " ==> "H o l a ! "
+
+        S1/S2        Filtra desde S1 los caracteres que no son los indicados
+                     en S2. Es complementario a DC(). Ejemplo:
+                     "20.356.019-5" / "0123456789"  ==> "203560195"
+
+        S1/N         Devuelve un substring de S1, desde la posición N en adelante.
+                     Ejemplo:
+                     "Este es un ejemplo. No otro"/at{"."}
+                 ==> ". No otro"
+                  
+        N/S1         Devuelve un substring de S1, desde la primera posición hasta
+                     la posición N. Ejemplo:
+                     at{"."}/"Este es un ejemplo. No otro"
+                 ==> "Este es un ejemplo."
+                     
+        S1\N         Ajusta desde S1 dentro de la línea procesada, a la posición
+                     indicada por N. Ejemplo:
+                     si #=" a[100]=0"
+                     "="\10 ==> " a[100]   =0"
+
+               <<IMPORTANTE>>
+                     Solo tomará la primera ocurrencia de S1; las demás, serán
+                     descartadas.
+                     
+        S1^S2        Idem a AF(S1,S2).
+
+        S1^N         Inserta S1 dentro de la línea procesada, en la posición N.
+                     Ejemplo:
+                     si #="base(100)"
+                     ".string"\at{"("} ==> "base.string(100)"
+                     
+        S1%S2        Devuelve "0" si S1 tiene coincidencias con el patrón
+                     indicado en S2. Ejemplo:
+                     "base-20192601.txt"  % "base-????????.*" ==> 0
+                     "base-201926011.txt" % "base-????????.*" ==> 1
+                     "0" indica "éxito".
+                     "1" indica, según el usuario:
+                     -informático de tomo y lomo: fracaso.
+                     -millenial: No te preocupes, es una oportunidad para
+                                 mejorar; no estás mal, solo es este editor
+                                 de mierda el que no te comprende... 
+                     "?" indica que se espera un solo caracter.
+                     "*" indica que se espera una secuencia de caracteres.
+
+
+   Funciones aritméticas.
+
+  
+   ABS(n), SQRT(n), LOG(n), LN(n), SIN(n), COS(n), TAN(n)
+                     Para qué las explico...
+
+   PI                Constante con el valor de PI.
+
+   INT(n)|[n]        Entero. 
+
+   CEIL(n)           Función techo.
+
+   FLOOR(n)          Función piso.
+
+   ROUND(n,dec)      Redondeo.
+
+   ROUND{dec}        Idem, pero en la línea procesada.
+
+   SGN(n)            -1 si n<0; 1 si n>0; 0 si n=0.
+
+   EXP(n)            Exponencial.
+
+   INV(n)            1/n.
+
+
+   Funciones básicas de texto.
+
+      
+   RP(#,V)           Reemplaza línea procesada por "V".
+
+      RP{V}          idem.
+
+   TRI(V)            Quita los espacios laterales de "V".
+
+   LTRI(V)           Quita solo los espacios a la izquierda de "V".
+
+   RTRI(V)           Quita solo los espacios a la derecha de "V".
+
+   UP(V)             Convierte "V" a mayúsculas.
+
+   LO(V)             Convierte "V" a minúsculas.
+
+   PC(V,N)           Centra un texto "V" entre "N" caracteres.
+
+      PC{N}          Centra la línea procesada.
+
+   PL(V,N)           Justifica el texto "V" hacia la derecha, entre
+                     "N" caracteres (padea "V" hacia la izquerda).
+
+      PL{N}          Idem, pero usa la línea procesada. 
+
+   PR(V,N)           Justifica el texto "V" hacia la izquierda, entre
+                     "N" caracteres.
+
+      PR{N}          Idem, pero usa la línea procesada.
+
+   CH(N)             Devuelve el caracter ASCII de "N".
+                     Ejemplo:
+                     ch(65) ==> "A"
+
+      '{N}           Idem.
+
+   ASC(S)            Devuelve el valor ASCII de "S".
+                     Ejemplo:
+                     asc("A") ==> 65
+
+      &{S}           Idem.
+
+   VAL(V)            Convierte "V" a tipo número para calcular. Si "V" es un
+                     string alfanumérico, "val(V)" devolverá "0". Cuidado!, 
+                     porque esto puede conducir a errores.
+
+      !{V}           Idem.
+
+   CP(V,N)           Repite "V", "N" veces. Ejemplo:
+                     cp("*",10)  ==> "**********"
+      {*N}           Repite la línea procesada, "N" veces.
+
+
+
+   Modificacion de BUFFER.
+
+   LIN(N)            Devuelve el contenido de la línea del BUFFER
+                     indicada por "N". Si "N" es 0, devuelve la línea
+                     actual.
+
+      #{N}           Idem.
+
+      #N             Idem.
+
+   Diferencia entre #{N} y #N:
+                     #{N} da la posibilidad de meter una expresión entre
+                     las llaves, ejemplo: #{(2+sgn(#10)*sgn(#10))}. En
+                     cambio, #N requiere que "N" sea una constante
+                     numérica.
+                     
+   LET(N,S)          Cambia el contenido de la línea de BUFFER "N", por "S".
+                     El cambio es permanente.
+                     Este comando sirve para emular variables.
+                     Es posible que Tolin devuelva un mensaje de error del tipo
+                     "Operación no válida", si este comando se ejecuta en
+                     solitario, pero hay que omitirlo si no lo acompaña un
+                     mensaje en la base de la pantalla.
+                     
+   COPY(V)           Toma el valor de "V" y lo deja en el BUFFER, bajo las
+                     siguientes condiciones:
+
+                  1) "V" debe contener algo. No copia string vacío.
+
+                  2) "V" debe ser distinto de "0".    
+
+                     Esta función no devuelve nada a la pila.
+                     
+                     copy(@1)
+
+        Importante   Esto sirve cuando quiere extraer líneas del texto marcado,
+                     que cumplan con una condición dada. Estas quedarán en el
+                     BUFFER, donde podrá hacer con ellas lo que desee.
+
+
+   Funciones avanzadas de texto.
+
+
+   CAT(V,W)          Concatena "V" con "W". Ambos, o cualquiera de ellos, pueden
+                     ser números. Ejemplo:
+                       cat("Número = ",(100+10))
+                     resultará:
+                       Número = 110
+                        
+      {V,W}          Idem.
+
+   LEN(V)            Largo de "V".
+
+   SUB(V,M,N)        Obtiene un substring de "V", que comienza en "M",
+                     con "N" caracteres de largo.
+
+      SUB{M,N}       Obtiene un substring de la línea procesada.
+
+   TR(V,S,T)         Reemplaza "S" por "T", en "V". El reemplazo no
+                     discrimina palabras completas de substrings.
+                     Ejemplo: si busca "sa", y reemplaza por "xu", el
+                     resultado final es:
+                       "sapo"   ==> "xupo"
+                       "salas"  ==> "xulas"
+                       "pisala" ==> "pixula" 
+
+      TR{S,T}        Idem, pero usa la línea procesada.
+
+   TRE(V,S,T)        Reemplaza exactamente "S" por "T". Sirve para borrar
+                     palabras si "T" es "".
+
+      TRE{S,T}       Idem, pero usa la línea procesada.
+
+   RPC(V,S,T)        Reemplaza en "V", todos los caracteres indicados por
+                     "S", por lo caracteres indicados por "T".
+                     Ejemplo:
+                     Si V="Av. acacia #666"
+                     rpc(V,".#1234567890","$@ABCDEFGHIJ")
+                     ==> "Av$ acacia @GGG"
+
+      RPC{S,T}       Idem, pero usa la línea procesada.
+
+   INS(V,S,P)        Inserta "S" en la posición "P" de "V". Si "P" es 0,
+                     devuelve la línea de "V" sin tocar.
+
+      INS{S,P}       Idem. Más corto y usa la línea procesada.
+
+   DC(V,S)           Elimina los caracteres en "V" indicados por "S".
+                     Por ejemplo:
+                     Si V="hola.. .mundo!$!"
+                     dc{".$"}  ==> "hola mundo!!"
+                     Puede usar caracteres no imprimibles, concatenando
+                     "CH(n)" o "'{n}" al string. 
+
+      DC{S}          Idem, pero en la línea procesada.
+
+   ONE(V,S)          Reduce secuencias de caracteres iguales, a uno solo.
+                     El caracter es indicado por "T".
+                     Ejemplo:
+                     Si V="2.00023     0.0289   1.29607  "
+                     one(V," ") ==> "2.00023 0.0289 1.29607"
+
+      ONE{S}         Idem, pero con la línea procesada.
+
+   AT(V,S)           Devuelve la posición donde inicia "S", en "V",
+                     contando de izquierda a derecha.
+
+      AT{S}          Idem, pero en la línea procesada.
+
+   RAT(V,S)          Devuelve la posición donde inicia "S", en "V",
+                     contando de derecha a izquierda.
+
+      RAT{S}         Idem, pero en la línea procesada. 
+
+   AF(V,S)           Tal como AT(), pero busca exactamente "S".
+                     La búsqueda se realiza de derecha a izquierda.
+
+      AF{S}          Idem, pero usando la línea procesada.
+
+   RANGE(V,C,D)      Busca en "V" los caracteres que están en el rango
+                     entre "C" y "D". "C" y "D" son números ASCII. Si
+                     encuentra alguno de ellos, devuelve su posición.
+                     Si no encuentra nada, devuelve "0".
+                     Si se usa dentro de POOL/LOOP, RANGE buscará más
+                     caracteres omitiendo el último hallazgo.
+                     Una aplicación de esta función se puede ver como
+                     un comando de CTRL-NN (e.g: "R 100, 120").
+                     Ejemplo:
+                        range(#,1,8)
+                     busca en "#" algún caracter ubicado entre ASCII 1
+                     y ASCII 8, y devuelve su posición.
+     
+     RANGE{C,D}      Idem, pero usa la línea procesada.
+
+   PTRP(V,N)         Avanza el inicio del string "V", "N" caracteres.
+                     Ejemplo:
+                         V="Postula"
+                         ptrp(V,4) ==> "tula"
+
+      {+N}           Idem, pero usa la línea procesada.
+
+   PTRM(V,N)         Retrocede el final del string "V", "N" caracteres.
+
+      {-N}           Idem, pero usa la línea procesada.
+
+
+
+   Tokens.
+
+   DEFT(S)           Define localmente un nuevo tokenizer.
+      
+   TK(V,N)           Obtiene el token "N" de "V". "N" comienza en 1.
+                     Si "N" es 0, devuelve la línea completa.
+                     Un token se devuelve sin espacios laterales.
+                     Un índice de token negativo da error.
+
+      ${N}           Obtiene el token "N" de la línea procesada.
+
+      $N             Obtiene el token "N" de la línea procesada.
+
+   Diferencia entre ${N} y $N:
+                     ${N} da la posibilidad de meter una expresión entre
+                     las llaves, ejemplo: ${2+sgn(#10)}. En cambio, $N
+                     requiere que "N" sea una constante numérica, tal y
+                     como se usa en AWK.
+
+   LETK(V,N,M)       Cambia el token indicado por "N", por el token
+                     indicado por "M", de "V".
+                     Si "M" es un tipo string, cambia el token "N" por el
+                     string. 
+                     Este comando no cambia el valor de "V", sino, su copia,
+                     la que es dejada en la pila de proceso.
+
+      LETK{N,M}      Idem, pero usa la línea procesada.
+
+
+   Funciones utilitarias.
+
+
+   MON(V,S,M,N)      Da formato moneda al número en "V", con un signo 
+                     monetario "S", un ancho "M", y "N" decimales. El
+                     primer caracter de "S" es un relleno.
+                     Ejemplo:
+                         mon("12345.3567",".US$",17,2)
+                     ==> US$.....12,345.36
+
+      MON{S,M,N}     Idem, pero usa la línea procesada.
+
+   MSK(V,S)          Da formato a "V", siguiendo un patrón "S". El
+                     primer caracter de "S" es un relleno.
+                     Ejemplo:
+                         msk("123456768"," ##.###.###-#")
+                     ==> 12.345.676-8
+
+      MSK{S}         Idem, pero usa la línea procesada.
+
+   SAT(V,S)          Crea, a partir de "V", un string formateado por "S".
+                     Sirve para dar formato a archivos de datos como 
+                     archivos largo-posición, por ejemplo.
+                     
+                     Un campo está formado por el signo "$", un número que
+                     indica posición de token (que inicia en 0), y, 
+                     opcionalmente, el ancho en caracteres seguido por la 
+                     justificación del texto (C,L,R), separado de "$n" por ":".
+                     Puede ser usado un campo simplemente indicando "$n", sin
+                     otro tipo de formateo.
+                     La función de XU "SATURA()", en el menú "CTRL-OP", sección
+                     "STANDARD" de ED4XU, posee información más detallada sobre el 
+                     formato de "S".
+             Ejemplo:
+
+                     si #=Juanito Pérez,5.334.234-K,Av. El Desguesadero S/N,
+                          Pedro Aguirre Cerda,300.000
+
+                     sat(#,"$0:30L$1:15L$2:25L$3:20L$4:10R")
+
+            devuelve:
+
+                   Juanito Pérez                 5.334.234-K    Av. El Desguesadero S/N                      Pedro Aguirre Cerda    300.000
+
+            Lo mismo hace:
+
+                   sat{"$0:30L$1:15L$2:25L$3:20L$4:10R"}
+
+                     Nuevamente, use "sat{}" si no piensa usar "#" como argumento
+                     de otra función. Si hace esto último, debe usar la forma "SAT()".
+
+      SAT{S}         Idem, pero usa la línea procesada.
+
+   MATCH(V,S)        Devuelve "0" si todos los tokens de "S" están en "V";
+                     de lo contrario, devuelve un número negativo.
+                     "S" debe separar sus tokens con "\;". Ejemplo:
+                     Si V="Mensaje a analizar por tokens"
+                     match(V,"analizar\;tokens") ==> 0
+                     match(V,"analiza\;tokens")  ==> -1
+                     match(V,"analiza\;token")   ==> -2
+                     Esta función es ideal para trabajar con IF() y con el
+                     BUFFER. Por ejemplo, en la siguiente línea, si el match
+                     es "0", devuelve la primera línea del BUFFER; de lo
+                     contrario, devuelve la segunda línea del BUFFER:
+                     
+                     if ( match{"string1\;string2"}, #1, #2 )
+                     
+      MATCH{S}       Idem, pero usa la línea procesada.
+   
+   EXPR-A-EVALUAR ? <EXPR1> [ : <EXPR2> ] ;|.
+                     Evalúa "EXPR-A-EVALUAR":
+                     
+                     1) Si es 0 o vacío, ejecuta <EXPR1>.
+                     2) (Opcional) De lo contrario, ejecuta <EXPR2>.
+                     
+                     El terminador ";"|"." es OBLIGATORIO, pues indica donde
+                     finaliza "?". Si no lo coloca, podría haber un error.
+
+          <<IMPORTANTE>>
+                     Puede anidar este comando.
+                     Puede usar "?" sin ":", pero no olvide el terminador ";"|".".
+                     Puede usar AND(), OR(), XOR() y "~" (negación), explicados
+                     más adelante.
+                     Puede usar más de una expresión en <EXPR1> y <EXPR2>, siempre
+                     y cuando estas no dejen más de un resultado en la pila
+                     al finalizar su macro.
+
+         >>COMENTARIOS>>
+                     Si usa ":" sin "?", saltará todo lo que venga después,
+                     dado que buscará ";" o ".".
+                     Este comando es más útil y eficiente que IFxx, dado que
+                     solo ejecuta lo que debe ejecutar, no como IFxx, que
+                     ejecuta todo, y luego elige el resultado en función de
+                     la evaluación.
+      
+   IF(F,S,T)         Si "F" es vacío o 0, devuelve "S", de lo contrario,
+                     devuelve "T".
+
+         <<IMPORTANTE>>
+                     IF (y sus variantes) necesita que "S" y "T" generen
+                     resultados que puedan ser guardados en la pila de
+                     proceso.
+                     Tanto "S" como "T" son ejecutados, pero uno de esos
+                     resultados será el ganador; el otro se desechará.
+                     Así que trate de que no haya error en ambos. Si no
+                     necesita un "ELSE", use NOP.
+
+                     "IF" devuelve un tipo string; por tanto, si trabaja con
+                     números, debe usar "VAL()" o "!{}". Ejemplo:
+                        val( if( ($1%2), $2, $3))*100
+                     Si el primer token es par, usa el token 2; sino, usa el
+                     token 3.
+                     Si desea comprobar cosas como si la expresión es negativa
+                     o positiva (distinta de 0), puede usar cosas como esta:
+
+                        if( sgn($1)+1, ..., ...)  Comprueba por negativo
+                        if( sgn($1)-1, ..., ...)  Comprueba por positivo
+                        if( sgn($1)+1, ..., if( sgn($1), ... ,...)  )
+                                                  Comprueba si es menor o igual
+                                                  a 0. Etc.
+
+                     El problema con el último ejemplo, es que tendrá que 
+                     repetir la operación tanto para "menor" como para "igual"
+                     a 0. Salvo que use las siguientes funciones, que solo
+                     trabajan con expresiones que devuelven números:
+
+    IFLE(F,S,T)      Comprueba si "F" es menor o igual a cero. 
+
+    IFGE(F,S,T)      Comprueba si "F" es mayor o igual a cero.
+            
+            NOTA     Si desea hacer algo cuando "F" sea menor que cero, solo use
+                     la parte "falso" de IFGE(); idem cuando desee hacer algo
+                     para "F" mayor que cero (IFLE()). Idem cuando desee hacer 
+                     algo con "F" distinto de cero, usando el falso de IF().
+
+    DIFERENCIAS ENTRE IFxx Y "?"
+                     Mientras IFxx deja un resultado en la pila en función de su
+                     evaluación, "?" no devuelve nada, sino que son las expresiones
+                     en su interior las que devuelven resultados.
+                     Tenga presente esta diferencia.
+
+    AND, OR y XOR    Se puede simular AND sumando el resultado de las operaciones
+                     de IFxx. Ejemplo:
+                        if( ( match{"word"} + (sgn($1)-1) ),...,...)
+                     si "match" encuentra una palabra, es "0", y si el primer
+                     token es positivo, el resultado es "0": AND.
+                     OR se puede simular con una multiplicación. 
+                        if( ( match{"word"} * (sgn($1)-1) ),...,...)
+                     Si uno de los resultados es "0", hará todo cero y se obtendrá
+                     la opción para "verdad"; lo mismo sucede si todos los resultados
+                     son "0". De lo contrario, si ninguno es "0", se obtendrá la
+                     opción para "falso".
+                     XOR es algo más rebuscado. Se puede simular así, con la 
+                     ayuda de registros de memoria para hacer el trabajo una
+                     sola vez:
+
+                        @1(sgn(match{"word"})*(-1))
+                        @2(sgn($1)-1)
+                        if ( ( (@1+(1-@2)) * ((1-@1)+@2) ), ..., ...)
+
+    AND(), OR(), XOR()
+                     Si todo lo anterior te parece "pajero", existen las funciones
+                     aludidas que hacen el mismo trabajo. Estas devuelven "0" si
+                     sus argumentos son "0", o "1" si alguno de ellos no cumple con
+                     la condición esperada. Solo aceptan dos argumentos. Ejemplo:
+                        if( and(match{"word"}, (sgn($1)-1)), ..., ...)
+                        if( or(match{"word"},  (sgn($1)-1)), ..., ...)
+                        if( xor(match{"word"}, (sgn($1)-1)), ..., ...)
+                     Se permite anidar dichas funciones. Obvio.
+     
+    "~" (negación)   Niega un resultado numérico: si "n" es 0, "~n" es 1, y si
+                     "n" es distinto de "0" (puede ser negativo), "~n" es 0. 
+                     Util.        
+
+
+   Operadores de bits.
+
+
+   Funciones y operadores de bits.
+
+                     Se incluye estos operadores y funciones, debido a que ED4XU es
+                     un editor para programadores, y también porque se puede hacer
+                     edición hexadecimal de archivos binarios (ver más adelante).
+   
+   Números de base diferente al decimal.
+                     ED4XU convertirá cualquier número de base hexadecimal, octal y
+                     binaria, a decimal, y lo hará por defecto en el análisis
+                     sintáctico. Igual se incluye un convertidor a decimal, por si
+                     desea convertir una cadena formada dentro de la expresión.
+                     Los números de base diferente son, y se deben escribir, así:
+   
+   BINARIA           Prefijo: "0x", dígitos "0" y "1", y sufijo "b". Ejemplo:
+                     0x10100101b 
+                     
+   HEXADECIMAL       Prefijo: "0x", dígitos 0-9, caracteres mayúsculas A,B,C,D,E,F,
+                     y sufijo "h". Ejemplo:
+                     0xA0389FFh
+   
+   OCTAL             Prefijo "0x", dígitos 0-7, y sufijo "o". Ejemplo
+                     0x7165o
+
+   Los siguientes operadores y funciones trabajan con números de 32 bits.
+   
+   &                 AND binario. Ejemplo 0x100101 & 25, 0xFF & 0x00101
+
+   |                 OR BINARIO.
+
+   !                 XOR BINARIO.
+
+   >>                Desplazamiento hacia la derecha. Ejemplo: 1>>2
+
+   <<                Desplazamiento hacia la izquierda, Ejemplo: 1<<2.
+   
+   Los operadores anteriores aceptan argumentos de strings, donde realizan operaciones
+   sobre el equivalente valor ASCII de cada caracter de estos. En los operadores ">>"
+   y "<<", el primer operando puede ser un string, pero el segundo operando debe ser
+   un número, porque decide el número de bits a desplazar. En los demás operadores,
+   ambos operandos deben ser del mismo tipo, ya sea números, ya sea strings.
+   El operador "~", operado con strings, sirve para cifrar cosas.
+   
+   BIT(N,P)          Devuelve el bit de "N" ubicado en la posición "P".
+
+   ON(N,P)           Enciende el bit "P" de "N" (lo deja en "1").
+
+   OFF(N,P)          Apaga el bit "P" de "N" (lo deja en "0").
+
+   NOT(N)            Negación binaria de "N" (complemento a 1).
+
+   BIN(N)            Devuelve la versión binaria de N.
+
+   HEX(N)            Devuelve la versión hexadecimal de N.
+
+   OCT(N)            Devuelve la versión octal de N.
+
+   DEC(S)            DEvuelve la versión decimal numérica de la cadena S.
+                     Ejemplo:
+                        dec("0xFFh") ==> 255.00
+                     Si intenta convertir una expresión constante sin comillas, habrá
+                     error, lo mimso si intenta usar DEC con un número decimal.
+   
+   Para realizar el cálculo de complemento a 2, simplemente escriba:
+   num-binario ! 0x11111...(n-bits)b + 1
+   También puede usar números hexadecimales, si desea.
+ 
+
+ EJEMPLO DE EXPRESION "Tolin":
+   Las siguientes expresiones extraen un string separado con comillas,
+   en cualquier ubicación.
+   La primera expresión está escrita con atajos, y la segunda, con sus
+   funciones equivalentes:
+   
+   sub{ (!{at{"\""})+1}, (!{rat{"\""}) - !{at{"\""}}-1 )  }
+
+   sub(#,val(at(#,ch(34))+1), (val(rat(#,ch(34)))-val(at(#, ch(34)))-1))
+   
+   (Es mucho más compacto escribir lo de arriba que lo de abajo, aunque esté
+    escrito en proto-sumerio)
+   
+   Si # = var<-getenv("SHELL")
+   La expresión devuelve: SHELL  (sin comillas)
+   
+ IMPORTANTE
+   Cualquier expresión aritmética usada como argumento de función, debe estar
+   escrita entre paréntesis. Por ejemplo:
+   
+   25,7 = _
+   
+   Tolin: { ($1 \ $2), {" Resto: ", ($1 % $2) } }   
+   
+   25,7 = 3 Resto: 4.0000000000000_
+   
+   La división entera y el resto módulo de los tokens 1 y 2, deben estar entre
+   paréntesis.
+
+ OTRO EJEMPLO.
+   Suponga que desea dejar en blanco aquellas líneas que no cumplen una condición:
+   
+   void  /* acepte la línea vacía como resultado valido */
+   #*(1-(match{"word"}*(-1)))
+   
+   o bien, para irse más a la segura:
+   
+   void
+   #*(1 - (sgn(match{"word"})) * (-1))
+   
+   Dejará solo las líneas que tienen "word", y las demás las dejará en blanco.
+
+ Y OTRO EJEMPLO.
+   Suponga que edita un archivo de cadenas de ADN, y desea encontrar, en una misma
+   línea, dos subcadenas, pero que no contenga una tercera subcadena:
+   
+   @1(match{"ATGCTT"})
+   @2(match{"ATAATC"})
+   @3(match{"ATTTAA"})
+   copy( if( and(and(@1,@2),(@3+1) ),I,0 ))
+   
+   Dejará en el BUFFER las líneas que cumplen con la condición.
+
+   Explicación: Si el match es realizado, devolverá "0". Así, si encuentra las cadenas
+   en @1 y @2, AND de más adentro devolverá "0". Luego, si encuentra un match para @3,
+   devolverá 0, pero no nos sirve, luego, se le suma 1, como una especie de negación.
+   Aquí, NOT() es un negador binario, no de valores de "verdad".
+   El primer AND evaluará todo, y el IF devolverá el número de línea actual si todo se
+   cumple; de lo contrario, devuelve "0". Ahora, COPY solo guardará en el BUFFER un
+   valor que sea distinto de vacío, o distinto de 0.
+
+ Y EL ULTIMO EJEMPLO.
+   Usted desea copiar al BUFFER las líneas que contengan, al menos, una comilla.
+
+   copy( sgn(at{"\""})*# )
+   
+   Copiará las líneas al BUFFER que contengan comillas. Si no encuentra comillas, 
+   AT() devuelve "0", SGN() devuelve 0, y 0*STRING es nada. Ahora, si encuentra,
+   AT() devolverá un número mayor que cero, SGN() devolvera "1", y 1*STRING es
+   el mismo STRING. Recordar que un string multiplicado por un número "N", produce una
+   réplica del mismo, "N" veces.
+
+  AUTOR.
+           Don Dalien, mayo de 2019. daniel.stuardo@gmail.com
+           Bugs, consultas, al mail.
+
