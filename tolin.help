@@ -7,33 +7,37 @@
 Modo de uso:
    tolin [-iehsSOEHT] -f [path]file <-t [path]filemacro | 'script-macro'> [> file]
 
-   -i n        línea inicial de proceso.
-   -e n        línea final de proceso.
-   -h          esta ayuda.
-   -s          estadísticas del archivo. Sirve para saber si se podr  procesar con Tolin.
-               Esta opción anula todas las demás, excepto '-fb'.
-   -S n        número de líneas a saltar luego de procesada una línea (Skip o incremento).
-   -O          (Odd)  procesa solo líneas impares. Si el proceso inicia en una línea par, esta es omitida.
-   -E          (even) procesa líneas pares. Si el proceso inicia en una línea impar, esta es omitida.
-   -H n        procesa las 'n' primeras líneas del archivo. Similar a HEAD de Linux.
-   -T n        procesa las 'n' últimas líneas del archivo. Similar a TAIL de Linux.
-   -f          indica el archivo a procesar. Puede añadir una ruta.
-   -F          procesa un lote de archivos, indicados con comodines. Ejemplo: *.txt.
-   -t          indica un archivo de macros.
-   -b          fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que
-               contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13. Si tiene un archivo de datos
-               que no debería tener estos caracteres, use '-b' para forzar su proceso.
- [-] 'script'  script de comandos que procesar n el archivo.
-               Use el guión '-' antes de 'script' si este viene a continuación del par metro '-F'.
-               Ejemplo:
+   -i n            línea inicial de proceso.
+   -e n            línea final de proceso.
+   -h              esta ayuda.
+   -man            manual de funciones y operadores de macros Tolin.
+   -s              estadísticas del archivo. Sirve para saber si se podrá procesar con Tolin.
+                   Esta opción anula todas las demás, excepto '-fb'.
+   -S n            número de líneas a saltar luego de procesada una línea (Skip o incremento).
+   -O              (Odd)  procesa solo líneas impares. Si el proceso inicia en una línea par, esta es omitida.
+   -E              (even) procesa líneas pares. Si el proceso inicia en una línea impar, esta es omitida.
+   -H n            procesa las 'n' primeras líneas del archivo. Similar a HEAD de Linux.
+   -T n            procesa las 'n' últimas líneas del archivo. Similar a TAIL de Linux.
+   -B v
+   -B 'v0 v1..'    añade valores al BUFFER, que puede ser usado por LET y LIN.                             
+                   Usar el BUFFER para guardar valores es como usar variables globales. Uselas.
+   -f              indica el archivo a procesar. Puede añadir una ruta.
+   -F              procesa un lote de archivos, indicados con comodines. Ejemplo: *.txt.
+   -t              indica un archivo de macros.
+   -b              fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que
+                   contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13. Si tiene un archivo de datos
+                   que no debería tener estos caracteres, use '-b' para forzar su proceso.
+ [-] 'script'      script de comandos que procesarán el archivo.
+                   Use el guión '-' antes de 'script' si este viene a continuación del parámetro '-F'.
+                   Ejemplo:
                     tolin -F *.txt - 'void at{"base"}?#;' -H 10  /* '-' necesario */
                     tolin -F *.txt -H 10 'void at{"base"}?#;'    /* '-' no necesario */
 
-               Los comandos y funciones son los mismos que usa ED4XU, por lo que se puede consultar
-               su ayuda para más detalles.
-               EXCEPCION: el comando CLEAR, en Tolin, limpia el BUFFER. Además, los comandos SAVE y LOAD
-               no tienen uso con Tolin, y el comando FILE, que devuelve el nombre del archivo procesado,
-               no existe en ED4XU.
+                   Los comandos y funciones son los mismos que usa ED4XU, por lo que se puede consultar
+                   su ayuda para más detalles.
+                   EXCEPCION: el comando CLEAR, en Tolin, limpia el BUFFER. Además, los comandos SAVE y LOAD
+                   no tienen uso con Tolin, y el comando FILE, que devuelve el nombre del archivo procesado,
+                   no existe en ED4XU.
 
   OBSERVACIONES.
        Tolin carga y analiza el archivo de entrada antes de procesarlo con los comandos y funciones de
@@ -41,13 +45,13 @@ Modo de uso:
        Como hace una carga inicial, es posible acceder a líneas que ya fueron procesadas, con LIN(n).
        Otras observaciones son las siguientes:
 
-           * La salida del proceso ser  la consola, o un archivo, si redirige la salida con '>',
+           * La salida del proceso será la consola, o un archivo, si redirige la salida con '>',
            * Aparte, puede obtener una salida alternativa usando el BUFFER de Tolin. La función
              COPY copia datos al BUFFER.
-           * El BUFFER es guardado al finalizar el proceso, en un archivo que tiene el mismo nombre
-             del archivo de proceso, más '.buffer'. Por ejemplo, si su archivo se llama 'datos.txt',
-             y usted usó el BUFFER para guardar datos, el archivo de salida del BUFFER ser :
-                     datos.txt.buffer
+           * El BUFFER es guardado al finalizar el proceso, en un archivo que tiene como nombre la
+             fecha y la hora actual, más '.buffer'. Por ejemplo, si usted usó el BUFFER para guardar
+             datos, el archivo de salida del BUFFER será:
+                     20191201_130435.buffer
            * Las opciones '-ie' son INCOMPATIBLES con '-HT'.
            * La opción '-f' es INCOMPATIBLE con '-F'.
            * Tolin no admite pipeline como datos de entrada. Debe usar '-f'.
@@ -84,12 +88,12 @@ Modo de uso:
 
                      tolin -F datos/*.csv -s
 
-        5) Para procesar un grupo de archivos. La salida ser  única, así como los datos almacenados en
+        5) Para procesar un grupo de archivos. La salida será única, así como los datos almacenados en
            el BUFFER con COPY:
 
                      tolin -F datos/*.csv 'void match{"CTAAGH"}?:{I,{"  :  ",#}};'
 
-           Buscar  exactamente 'CTAAGH'; si lo encuentra, despliega la línea con el número de línea.
+           Buscará exactamente 'CTAAGH'; si lo encuentra, despliega la línea con el número de línea.
            Si no lo encuentra, no hace nada (eso quiere decir '?:')
 
   
@@ -156,22 +160,12 @@ Modo de uso:
    NULL              Puesta al principio de la expresión, provoca que
                      la iteración termine cuando encuentre una línea
                      vacía.
-                     La línea vacía es útil cuando se intenta usar valores
-                     fuera del rango de los datos a operar, como si
-                     fuesen constantes. Sin embargo, cuando se procesan
-                     líneas de texto, no tiene sentido que la iteración
-                     termine ahí. Para eso sirve NULL. Ejemplo:
-                        null $1/tk(#(10),3)
-                     Dividirá los datos de la columna 1 por el tercer dato
-                     de la línea 10. La línea 10 debe estar después de una
-                     línea vacía.
                      
    I                 Variable que contiene el número de la línea que se
                      está procesando.
    
    NT                Número total de tokens de la línea procesada. Su valor
-                     depende de DEFTOK o de la función DEFT(), descrita más
-                     adelante.
+                     depende de la función DEFT(), descrita más adelante.
 
    VOID              Indica a Tolin que si un resultado es vacío, lo añada a
                      la pila de resultados. Sin este flag, los resultados
@@ -207,7 +201,7 @@ Modo de uso:
 
       @n             Idem.
       
-      Importante     Los registros de memoria fueron incluido para solventar
+      Importante     Los registros de memoria fueron incluidos para solventar
                      procesos complejos de edición; sin embargo, pueden ser
                      mal usados, como por ejemplo, @n(v) no deja ningún 
                      valor en la pila, y eso está mal. Se resuelve si se
@@ -323,7 +317,7 @@ Modo de uso:
         S1^N         Inserta S1 dentro de la línea procesada, en la posición N.
                      Ejemplo:
                      si #="base(100)"
-                     ".string"\at{"("} ==> "base.string(100)"
+                     ".string"^at{"("} ==> "base.string(100)"
                      
         S1%S2        Devuelve "0" si S1 tiene coincidencias con el patrón
                      indicado en S2. Ejemplo:
@@ -366,6 +360,14 @@ Modo de uso:
 
    Funciones básicas de texto.
 
+   UTF8(V)           Convierte "V" a codificación UTF8. Por defecto, Tolin
+                     realiza la conversión. Sin embargo, cuando lee en modo
+                     binario, es posible que dicha conversión falle.
+                     
+   ANSI(V)           Convierte "V" de UTF8 a ANSI, útil para cuando se leen
+                     archivos en modo binario.
+                     
+        <<IMPORTANTE>> Se aceptan combinaciones entre estas funciones.
       
    RP(#,V)           Reemplaza línea procesada por "V".
 
@@ -399,19 +401,19 @@ Modo de uso:
                      Ejemplo:
                      ch(65) ==> "A"
 
-      '{N}           Idem.
-
    ASC(S)            Devuelve el valor ASCII de "S".
                      Ejemplo:
                      asc("A") ==> 65
 
-      &{S}           Idem.
-
    VAL(V)            Convierte "V" a tipo número para calcular. Si "V" es un
-                     string alfanumérico, "val(V)" devolverá "0". Cuidado!, 
-                     porque esto puede conducir a errores.
+                     string alfanumérico y no-numérico (no contiene dígitos),
+                     VAL producirá un error.
 
-      !{V}           Idem.
+      (&V)           Idem.
+
+   STR(V)            Convierte "V" a tipo string.
+   
+      ($V)           Idem.
 
    CP(V,N)           Repite "V", "N" veces. Ejemplo:
                      cp("*",10)  ==> "**********"
