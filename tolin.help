@@ -52,6 +52,7 @@ Modo de uso:
              fecha y la hora actual, más '.buffer'. Por ejemplo, si usted usó el BUFFER para guardar
              datos, el archivo de salida del BUFFER será:
                      20191201_130435.buffer
+             Si usa la opción RESET, el BUFFER será guardado de manera diferente (ver RESET más adelante).
            * Las opciones '-ie' son INCOMPATIBLES con '-HT'.
            * La opción '-f' es INCOMPATIBLE con '-F'.
            * Tolin no admite pipeline como datos de entrada. Debe usar '-f'.
@@ -169,7 +170,16 @@ Modo de uso:
 
    VOID              Indica a Tolin que si un resultado es vacío, lo añada a
                      la pila de resultados. Sin este flag, los resultados
-                     vacíos no son considerados.
+                     vacíos no son considerados. Esto no tiene nada que ver
+                     con la función COPY.
+   
+   RESET             Resetea el BUFFER en cada cambio de archivo. Esto incluye
+                     los valores del espacio de variables del BUFFER (declarados
+                     con '-B'), los que vuelven a su declaración original.
+                     Al final de cada archivo, si existen valores adicionales
+                     a las variables globales en el BUFFER, se guardará dicho
+                     contenido en un archivo cuyo nombre será el nombre del
+                     archivo, más ".buffer".
    
    NOP               Instrucción pedorra cuyo único objetivo es dejar un
                      caracter nulo en la pila de resultados. Es muy útil
@@ -397,7 +407,9 @@ Modo de uso:
 
       PR{N}          Idem, pero usa la línea procesada.
 
-   CH(N)             Devuelve el caracter ASCII de "N".
+   CH(N)             Devuelve el caracter ASCII de "N". Si "N" está fuera del
+                     rango, ya sea que fuese un valor negativo o mayor que 254,
+                     se aplicará módulo 255 y devolverá el caracter respectivo.
                      Ejemplo:
                      ch(65) ==> "A"
 
@@ -424,8 +436,8 @@ Modo de uso:
    Modificacion de BUFFER.
 
    LIN(N)            Devuelve el contenido de la línea del BUFFER
-                     indicada por "N". Si "N" es 0, devuelve la línea
-                     actual.
+                     indicada por "N". Si "N" está fuera del rango, se
+                     devolverá un error y el proceso se detendrá.
 
       #{N}           Idem.
 
@@ -456,9 +468,9 @@ Modo de uso:
                      
                      copy(@1)
 
-        Importante   Esto sirve cuando quiere extraer líneas del texto marcado,
-                     que cumplan con una condición dada. Estas quedarán en el
-                     BUFFER, donde podrá hacer con ellas lo que desee.
+        Importante   Esto sirve cuando quiere extraer líneas del texto procesado.
+                     Estas quedarán en el BUFFER, el cual será guardado en un
+                     archivo anexo al proceso.
 
 
    Funciones avanzadas de texto.

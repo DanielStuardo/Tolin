@@ -1,3 +1,5 @@
+#include "memoedit.ch"
+
 REQUEST HB_LANG_ES
 HB_LANGSELECT( "ES" )
 REQUEST HB_CODEPAGE_UTF8
@@ -60,6 +62,7 @@ swTail:=.F.
 nHead:=0
 nTail:=0
 nIncremento:=1
+nHEADVAR:=1
 swStat:=.F.
 swManual:=.F.
 BUFFERLINEA:=256
@@ -160,6 +163,9 @@ inputMultiple:={}
                AADD(BUFFER,num)
             end
             ++j
+            tmpBUFFER:=array(len(BUFFER))
+            acopy(BUFFER,tmpBUFFER)
+            nHEADVAR:=len(BUFFER)+1
          end
 
       elseif STRING=="-F"  // archivo input multiples
@@ -220,16 +226,112 @@ inputMultiple:={}
 STRING:=""
 
 if swManual
+
    setcursor(0)
    TLINEA:=MAXROW()
    SLINEA:=MAXCOL()
-   MSGTOTAL:="AYUDA DE MACROS - TOLIN                ^C=Av Pag.  ^R=Re Pag. "
-   @ 0,0 CLEAR TO TLINEA-3,MAXCOL()
-   @ 1, 1 TO TLINEA-3,MAXCOL()-1 DOUBLE
-   setpos(0,2); outstd( MSGTOTAL )
-   MSGBARRA("This program is free")
-   setcolor( 'GR+/N,N/GR+,,,W/N' )
-   MEMOEDIT(hb_utf8tostr(MEMOREAD("tolin.help")),2,2,TLINEA-4,SLINEA-2, .F.)
+   cVAR:=hb_utf8tostr(MEMOREAD("tolin.help"))
+   MSGTOTAL:="AYUDA DE MACROS - TOLIN  | ^C=Av Pag. ^R=Re Pag. ^N=Search ^K=Next ^J=Before"
+   public nRow:=1
+   public nColumn:=0
+   nPos:={}
+   LISTAFOUND:={}
+   cBUSCA:=""
+   oldBUSCA:=space(30)
+   tfound:=0
+   nInc:=1
+      @ 0,0 CLEAR TO TLINEA-3,MAXCOL()
+      @ 1, 1 TO TLINEA-3,MAXCOL()-1 DOUBLE
+      setpos(0,2); outstd( MSGTOTAL )
+   while .T.
+
+      MSGBARRA("This program is free")
+      setcolor( 'GR+/N,N/GR+,,,W/N' )
+      while inkey()!=0
+         ;
+      end
+      cVAR:=MEMOEDIT(cVAR,2,2,TLINEA-4,SLINEA-2, .F.,"MemoUDF",,SLINEA,nRow,nColumn)
+      c:=inkey()
+      if lastkey()==27
+         exit
+      end
+     // ? "LASTKEY=",LASTKEY()
+      if c==11
+         c:=14; nInc:=1; hb_keyPut(13)
+      elseif c==10
+         c:=14; nInc:=-1; hb_keyPut(13)
+      end
+      if c==14
+         @ TLINEA-2,0 CLEAR TO TLINEA,SLINEA
+         cBUSCA:=oldBUSCA+space(30-len(oldBUSCA))   //space(int(SLINEA/2))
+         @TLINEA-1, 2 say "SEARCH? " get cBUSCA pict "@S20"
+         read
+         cBUSCA:=alltrim(cBUSCA)
+     //    ? "CBUSCA = ",cBUSCA; inkey(0)
+          
+         if len(cBUSCA)>0
+            if oldBUSCA!=cBUSCA
+            LISTAFOUND:={}
+            nOCURR:=NUMAT(cBUSCA,cVAR)
+            if nOCURR>0
+           //    ? "OCURRENCIAS:",nOCURR
+               for j:=1 to nOCURR
+                  tmpPos:=ATNUM(cBUSCA,cVAR,j)
+             //     ? "POS ",j," = ",tmpPos
+                  if tmpPos>0
+                     AADD(LISTAFOUND,tmpPos)
+                  end 
+               end
+            end
+          //  inkey(0)
+            if len(LISTAFOUND)>0
+               tFound:=1
+               nPos := MPosToLC(cVAR, SLINEA, LISTAFOUND[tFound])
+               nRow:=nPos[1]
+               nColumn:=nPos[2]
+               oldBUSCA:=cBUSCA
+            else
+               @ TLINEA-1,0 CLEAR TO TLINEA,SLINEA
+               @ TLINEA-1,2 say "MATCH NOT FOUND!"
+               inkey(0)
+            end
+            else
+            if len(LISTAFOUND)>0
+               if nInc>0
+                  if tFound==len(LISTAFOUND)
+                     tFound:=1
+                  else
+                     tFound:=tFound+nInc
+                  end
+               else
+                  if tFound==1
+                     tFound:=len(LISTAFOUND)
+                  else
+                     tFound:=tFound+nInc
+                  end
+               end
+               nPos := MPosToLC(cVAR, SLINEA, LISTAFOUND[tFound])
+                nRow:=nPos[1]
+               nColumn:=nPos[2]
+            end
+            end
+         end
+     // elseif c==11  // siguiente palabra
+         /*if len(LISTAFOUND)>0
+            if tFound==len(LISTAFOUND)
+               tFound:=1
+            else
+               ++tFound
+            end
+            nPos := MPosToLC(cVAR, SLINEA, LISTAFOUND[tFound])
+            nRow:=nPos[1]
+            nColumn:=nPos[2]
+         end*/
+      end
+     /* while inkey()==0
+         ;
+      end */
+   end
    setcursor(1)
    clear
    quit
@@ -515,9 +617,10 @@ if lini>lfin
    quit
 end
 
-SWNOTNUL:=.F.
-SWKEEPVACIO:=.F.
-SWNOBUFFER:=.F.
+public SWNOTNUL:=.F.
+public SWKEEPVACIO:=.F.
+public SWNOBUFFER:=.F.
+public SWRESET:=.F.
 
 /* LECTURA DEL ARCHIVO */
 /*fp:=fopen(inputFile,0)
@@ -625,7 +728,21 @@ end
     //   end
    end
    CX=""
-
+   if SWRESET
+      if len(BUFFER)>=nHEADVAR
+         tARCHIVO:=substr(inputFile,rat("/",inputFile)+1,len(inputFile))+".buffer"   //strtran(dtoc(date()),"/","")+"_"+strtran(time(),":","")+".buffer"
+         if !SAVEFILE(BUFFER,tARCHIVO,LEN(BUFFER),nHEADVAR)
+            _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
+            quit
+         end
+      end
+      if nHEADVAR>1   // reset el buffer
+         BUFFER:=array(len(tmpBUFFER))
+         acopy(tmpBUFFER,BUFFER)   // vuelve a los valores originales
+      else
+         BUFFER:={}
+      end
+   end
 
 /*********/
 //fclose(fp)
@@ -633,17 +750,46 @@ end
 END  // for
 
 /* VERIFICO si BUFFER tiene algo que guardar */
-if len(BUFFER)>0
-   tARCHIVO:=strtran(dtoc(date()),"/","")+"_"+strtran(time(),":","")+".buffer"
-   if !SAVEFILE(BUFFER,tARCHIVO,LEN(BUFFER))
-      _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
-      quit
+if !SWRESET
+   if len(BUFFER)>=nHEADVAR
+      tARCHIVO:=strtran(dtoc(date()),"/","")+"_"+strtran(time(),":","")+".buffer"
+      if !SAVEFILE(BUFFER,tARCHIVO,LEN(BUFFER),nHEADVAR)
+         _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
+         quit
+      end
+ /*     if nHEADVAR>1   // reset el buffer
+         BUFFER:=array(len(tmpBUFFER))
+         acopy(tmpBUFFER,BUFFER)
+      else
+         BUFFER:={}
+      end */
    end
 end
 
 return NIL
 
 /** funciones Harbour **/
+FUNCTION MemoUDF( nMode, nLine, nCol )
+LOCAL nKey := LASTKEY(),i,j,c
+LOCAL nRetVal := ME_DEFAULT // Default return action
+
+if nKey==14   // ctrl-n
+    hb_keyPut(23)
+    hb_keyPut(14)
+    nRow:=nLine
+    nColumn:=nCol
+    nRetVal := ME_IDLE
+elseif nKey==11  // ctrl-k
+    hb_keyPut(23)
+    hb_keyPut(11)
+    nRetVal := ME_IDLE
+elseif nKey==10  // ctrl-j
+    hb_keyPut(23)
+    hb_keyPut(10)
+    nRetVal := ME_IDLE
+end
+
+RETURN nRetVal 
 
 PROCEDURE MSGBARRA(MSG)
 //SETCOLOR(N2COLOR(cBARRA))
@@ -655,14 +801,14 @@ setpos(TLINEA  ,int(SLINEA/2)-14);outstd("(Press ESC to continue...)")
 RETURN
 
 
-FUNCTION SAVEFILE(TEXTO,ARCHIVO,TOPE)
+FUNCTION SAVEFILE(TEXTO,ARCHIVO,TOPE,nHEADVAR)
 LOCAL I,FP,STRING,J,LIN,EXT
 
   IF (FP:=FCREATE(ARCHIVO))==0
      RETURN .F.
   END
   LIN:=0
-  FOR I:=1 TO TOPE
+  FOR I:=nHEADVAR TO TOPE
      if valtype(TEXTO[I])=="C"
         STRING:=hb_strtoutf8(TEXTO[I])+_CR
      else
@@ -726,7 +872,6 @@ end
 DX:=cTMP
 cTMP:=""
 
-
 /* algunos reemplazos necesarios */
 if "null" $ DX   // iteración no cancela con líneas nulas
    SWNOTNUL:=.T.
@@ -743,6 +888,10 @@ end
 if "nobuff" $ DX
    SWNOBUFFER:=.T.
    DX:=strtran(DX,"nobuff","")
+end
+if "reset" $ DX
+   SWRESET:=.T.
+   DX:=strtran(DX,"reset","")
 end
 
 ////DX:=strtran(DX,"?(","IF(")
@@ -2586,14 +2735,15 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)
                if valtype(n)!="N"
                   n:=val(n)
-                  if n<=0 .or. n>255
-                     AADD(pila,"null")
-                  else
-                     AADD(pila,chr(n)+chr(0))
-                  end
-               else
-                  AADD(pila,chr(n)+chr(0))
+                 // if n<=0 .or. n>255
+                 //    AADD(pila,"null")
+                 // else
+                 //    AADD(pila,chr(n)+chr(0))
+                 // end
+               //else
                end
+                  AADD(pila,chr(n)+chr(0))
+               //end
 
             elseif m=="VAL"
                n:=SDP(pila)
