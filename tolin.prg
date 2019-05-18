@@ -1,3 +1,32 @@
+/**********************************************************
+
+   ED4XU editor de textos con lenguaje de macros propio
+   
+   Autor: Daniel Stuardo
+   
+   daniel.stuardo@gmail.com
+   
+   noviembre 2018, 2019.
+   
+   Editor hecho con Harbour 3.0 y ansi C. Parte del código
+   escrito es una adaptación de código C Harbour, o un uso
+   completo, y otra parte fue escrito por el autor en años
+   anteriores, cuando no conocía Harbour y pensaba que no había
+   conocido funciones de proceso de texto más geniales que las
+   de Clipper.
+   
+   Dejo mucho código comentado, por que no lo uso, pero
+   podría ser útil para alguien más.
+   
+   Agradecimientos a todos los mencionados en este programa
+   cuyos aportes potenciaron a Xu.
+   
+   Si va a utilizar parte del código que no es Harobur y que
+   es propiedad del autor, hágalo, pero mencione quién lo 
+   escribió.
+   
+***********************************************************/
+
 #include "memoedit.ch"
 
 REQUEST HB_LANG_ES
