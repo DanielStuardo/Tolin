@@ -12,6 +12,10 @@ public lini:=0
 public lfin:=0
 public STRING
 public BUFFER:={}
+public SWNOTNUL:=.F.
+public SWKEEPVACIO:=.F.
+public SWNOBUFFER:=.F.
+public SWRESET:=.F.
 
 numParam:=PCOUNT()
 
@@ -359,69 +363,14 @@ if swHelp
    outstd(hb_utf8tostr("   -B valor    añade un valor al BUFFER, que puede ser usado por LET y LIN.")+_CR)
    outstd(hb_utf8tostr("               Usar el BUFFER para guardar valores es como usar variables globales. Uselas.")+_CR)   
    outstd(hb_utf8tostr("   -f          indica el archivo a procesar. Puede añadir una ruta.")+_CR)
+   
    outstd(hb_utf8tostr("   -F          procesa un lote de archivos, indicados con comodines. Ejemplo: *.txt.")+_CR)
    outstd(hb_utf8tostr("   -t          indica un archivo de macros.")+_CR)
    outstd(hb_utf8tostr("   -b          fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que")+_CR)
-   outstd(hb_utf8tostr("               contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13. Si tiene un archivo de datos")+_CR)
-   outstd(hb_utf8tostr("               que no debería tener estos caracteres, use '-b' para forzar su proceso.")+_CR)
-   outstd(hb_utf8tostr(" [-] 'script'  script de comandos que procesarán el archivo.")+_CR)
-   outstd(hb_utf8tostr("               Use el guión '-' antes de 'script' si este viene a continuación del parámetro '-F'.")+_CR)
-   outstd(hb_utf8tostr("               Ejemplo:")+_CR)
-   outstd(hb_utf8tostr("                    tolin -F *.txt - 'void at{"+chr(34)+"base"+chr(34)+"}?#;' -H 10  /* '-' necesario */")+_CR)
-   outstd(hb_utf8tostr("                    tolin -F *.txt -H 10 'void at{"+chr(34)+"base"+chr(34)+"}?#;'    /* '-' no necesario */")+_CR+_CR)
-   outstd(hb_utf8tostr("               Los comandos y funciones son los mismos que usa ED4XU, por lo que se puede consultar")+_CR)
-   outstd(hb_utf8tostr("               su ayuda para más detalles.")+_CR)
-   outstd(hb_utf8tostr("               EXCEPCION: el comando CLEAR, en Tolin, limpia el BUFFER. Además, los comandos SAVE y LOAD")+_CR)
-   outstd(hb_utf8tostr("               no tienen uso con Tolin, y el comando FILE, que devuelve el nombre del archivo procesado,")+_CR)
-   outstd(hb_utf8tostr("               no existe en ED4XU.")+_CR+_CR)
-   outstd(hb_utf8tostr("  OBSERVACIONES.")+_CR)
-   outstd(hb_utf8tostr("       Tolin carga y analiza el archivo de entrada antes de procesarlo con los comandos y funciones de")+_CR)
-   outstd(hb_utf8tostr("       macros de Edit4Xu. No acepta ser parte del pipeline.")+_CR)
-//   outstd(hb_utf8tostr("       Como hace una carga inicial, es posible acceder a líneas que ya fueron procesadas, con LIN(n).")+_CR)
-   outstd(hb_utf8tostr("       Otras observaciones son las siguientes:")+_CR+_CR)
-   outstd(hb_utf8tostr("           * La salida del proceso será la consola, o un archivo, si redirige la salida con '>',")+_CR)
-   outstd(hb_utf8tostr("           * Aparte, puede obtener una salida alternativa usando el BUFFER de Tolin. La función")+_CR)
-   outstd(hb_utf8tostr("             COPY copia datos al BUFFER.")+_CR)
-   outstd(hb_utf8tostr("           * El BUFFER es guardado al finalizar el proceso, en un archivo que tiene como nombre la")+_CR)
-   outstd(hb_utf8tostr("             fecha y la hora actual, más '.buffer'. Por ejemplo, si usted usó el BUFFER para guardar")+_CR)
-   outstd(hb_utf8tostr("             datos, el archivo de salida del BUFFER ser :")+_CR)
-   outstd(hb_utf8tostr("                     20191201_130435.buffer")+_CR)
-   outstd(hb_utf8tostr("           * Las opciones '-ie' son INCOMPATIBLES con '-HT'.")+_CR)
-   outstd(hb_utf8tostr("           * La opción '-f' es INCOMPATIBLE con '-F'.")+_CR)
-   outstd(hb_utf8tostr("           * Tolin no admite pipeline como datos de entrada. Debe usar '-f'.")+_CR)
-   outstd(hb_utf8tostr("           * Por defecto, Tolin lee archivos UTF8 y US-ASCII, y no hace conversión de codepage.")+_CR)
-   outstd(hb_utf8tostr("             Sin embargo, hace un esfuerzo. Intente '-s' para saber si su archivo puede ser procesado.")+_CR+_CR)
-   outstd(hb_utf8tostr("  EJEMPLOS.")+_CR)
-   outstd(hb_utf8tostr("        1) Si un archivo 'nuevo.txt' contiene un caracter anómalo (e.g. #1), el comando:")+_CR+_CR)
-   outstd(hb_utf8tostr("                     tolin -f nuevo.txt -b 'void at{ch(1)}?#:tr{ch(1),")+chr(34)+chr(34)+"};'"+_CR+_CR)
-   outstd(hb_utf8tostr("           podrá procesarlo, reemplazando #1 por nada. Debe usar '-b'.")+_CR)
-   outstd(hb_utf8tostr("           El comando VOID indica que deben incluirse las líneas en blanco en el proceso.")+_CR)
-   outstd(hb_utf8tostr("           La función TR reemplaza todo lo que encuentre en la línea.")+_CR)
-   outstd(hb_utf8tostr("           La función AT devuelve la posición del primer match, sin importar si es una palabra completa")+_CR)
-   outstd(hb_utf8tostr("           o es parte de otra. La función AF busca el match exacto y completo.")+_CR+_CR)
-   outstd(hb_utf8tostr("        2) Si 'prog.c' tiene una codificación US-ASCII o ISO-8859xx, es posible que use #10 y #13")+_CR)
-   outstd(hb_utf8tostr("           como salto de línea. Para eliminar #13, basta con hacer esto:")+_CR+_CR)
-   outstd(hb_utf8tostr("                     tolin -f prog.c 'void #'")+_CR+_CR)
-   outstd(hb_utf8tostr("        3) Suponga un programa Harbour donde se haya escrito en duro el caracter flecha (#16), en")+_CR)
-   outstd(hb_utf8tostr("           muchas líneas. Para reparar eso, puede usar la siguiente línea:")+_CR+_CR)
-   outstd(hb_utf8tostr("                     tolin -f clrsel.prg -b 'void at{ch(16)}?#:tr{("+;
-                                              chr(34)+"\"+chr(34)+chr(34)+"+"+;
-                                              "ch(16)+"+chr(34)+"\"+chr(34)+chr(34)+;
-                                              "),"+chr(34)+"chr(16)"+chr(34)+"};'")+_CR+_CR)
-   outstd(hb_utf8tostr("           Aparte de eliminar los #13 sobrantes (propio de codificación US-ASCII), busca el caracter")+_CR)
-   outstd(hb_utf8tostr("           anómalo (AT); si no lo encuentra, libera la línea completa. Pero, si lo encuentra, reemplaza")+_CR)
-   outstd(hb_utf8tostr("           el caracter "+chr(34)+chr(16)+chr(34)+", por "+chr(34)+"chr(16)"+chr(34)+", la función.")+_CR)
-   outstd(hb_utf8tostr("           El caracter de escape '\"+chr(34)+"' se usa para que Tolin pueda reconocer comillas.")+_CR+_CR)
-   outstd(hb_utf8tostr("        4) Para conocer la estadística de un grupo de archivos:")+_CR+_CR)   
-   outstd(hb_utf8tostr("                     tolin -F datos/*.csv -s")+_CR+_CR)
-   outstd(hb_utf8tostr("        5) Para procesar un grupo de archivos. La salida será única, así como los datos almacenados en")+_CR)
-   outstd(hb_utf8tostr("           el BUFFER con COPY:")+_CR+_CR)
-   outstd(hb_utf8tostr("                     tolin -F datos/*.csv 'void match{"+chr(34)+"CTAAGH"+chr(34)+"}?:{I,{"+chr(34)+;
-                                             "  :  "+chr(34)+",#}};'")+_CR+_CR)
-   outstd(hb_utf8tostr("           Buscará exactamente 'CTAAGH'; si lo encuentra, despliega la línea con el número de línea.")+_CR)
-   outstd(hb_utf8tostr("           Si no lo encuentra, no hace nada (eso quiere decir '?:')")+_CR+_CR)
+   outstd(hb_utf8tostr("               contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13.")+_CR+_CR)
+   outstd(hb_utf8tostr("  Consulte 'tolin -man' para funciones macros y ejemplos.")+_CR+_CR)
    outstd(hb_utf8tostr("  AUTOR.")+_CR)
-   outstd(hb_utf8tostr("           Don Dalien, mayo de 2019. daniel.stuardo@gmail.com")+_CR)
+   outstd(hb_utf8tostr("           Mr. Dalien, mayo de 2019. daniel.stuardo@gmail.com")+_CR)
    outstd(hb_utf8tostr("           Bugs, consultas, al mail.")+_CR+_CR)
 
    quit
@@ -433,7 +382,7 @@ end
 end*/
 
 if swInput
-   if !file(inputFile)
+   if !file(inputFile) .and. inputFile!="foo"
       outstd(_CR+"No existe el archivo de entrada '"+inputFile+"'"+_CR+_CR+"Tolin aborta"+_CR)
       quit
    end
@@ -476,6 +425,7 @@ FOR nFile:=1 to len(inputMultiple)
 
 inputFile:=inputMultiple[nFile]
 
+if lower(inputFile)!="foo"
 /* VERIFICA TIPO DE ARCHIVO Y OBTIENE DATOS DEL ARCHIVO */
 if OPERATING_SYSTEM=="LINUX" 
    EXT:=FUNFSHELL("file -i "+inputFile,3)
@@ -532,11 +482,11 @@ if EXT!="binary" .or. swBinario
             NUMCAR:=LEN(cBUFF)
             STRING:=GETLINEAS(cBUFF,NL,NUMCAR,BUFFERLINEA)
          else 
-            outstd(_CR+"El archivo '"+inputFile+"' no puede ser procesado por Tolin. Prueba Edit4Xu."+CR+CR+"Tolin aborta."+_CR)
+            outstd(_CR+"El archivo '"+inputFile+"' no puede ser procesado por Tolin. Prueba Edit4Xu."+_CR+_CR+"Tolin aborta."+_CR)
             quit
          end
       else
-        outstd(_CR+"El archivo '"+inputFile+"' no puede ser procesado por Tolin. Prueba Edit4Xu."+CR+CR+"Tolin aborta."+_CR)
+        outstd(_CR+"El archivo '"+inputFile+"' no puede ser procesado por Tolin. Prueba Edit4Xu."+_CR+_CR+"Tolin aborta."+_CR)
         quit
       end
 
@@ -589,8 +539,6 @@ elseif lfin>NL
    lfin:=NL
 end
 
-/********/
-
 /* COMIENZA EL PROCESO */
 
 /* VERIFICA HEAD */
@@ -617,10 +565,18 @@ if lini>lfin
    quit
 end
 
-public SWNOTNUL:=.F.
-public SWKEEPVACIO:=.F.
-public SWNOBUFFER:=.F.
-public SWRESET:=.F.
+else   // archivo FOO
+   lini:=1
+   lfin:=1
+   nIncremento:=1
+   STRING:={" "}
+end
+/********/
+
+SWNOTNUL:=.F.
+SWKEEPVACIO:=.F.
+SWNOBUFFER:=.F.
+SWRESET:=.F.
 
 /* LECTURA DEL ARCHIVO */
 /*fp:=fopen(inputFile,0)
@@ -644,7 +600,7 @@ fclose(fp)*/
 Q:=_CTRLL_OBTIENELISTA(_file)
 
 if len(Q)==0
-   fclose(fp)
+  // fclose(fp)
    return NIL
 end
 /*R:={}
@@ -657,7 +613,7 @@ end
 //R:=_CTRLL_EVALUA(T,R)
 R:=_CTRLL_EVALUA(Q[1],Q[2])
 if valtype(R)=="L"
-   fclose(fp)
+  // fclose(fp)
    return NIL
 end
 
@@ -714,7 +670,8 @@ end
           else
              if len(RX)>0
                 //outstd(RX+_CR)
-                fwrite(1,hb_strtoutf8(RX)+_CR)
+                RX:=strtran(RX,chr(0),"")
+                fwrite(1,hb_strtoutf8(strtran(RX,"\n",hb_osnewline()))+_CR)
              else
                 if SWKEEPVACIO
                    //outstd(_CR)
@@ -752,7 +709,11 @@ END  // for
 /* VERIFICO si BUFFER tiene algo que guardar */
 if !SWRESET
    if len(BUFFER)>=nHEADVAR
-      tARCHIVO:=strtran(dtoc(date()),"/","")+"_"+strtran(time(),":","")+".buffer"
+      if lower(inputFile)!="foo"
+         tARCHIVO:=strtran(dtoc(date()),"/","")+"_"+strtran(time(),":","")+".buffer"
+      else
+         tARCHIVO:="foo.buffer"
+      end
       if !SAVEFILE(BUFFER,tARCHIVO,LEN(BUFFER),nHEADVAR)
          _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
          quit
@@ -814,6 +775,7 @@ LOCAL I,FP,STRING,J,LIN,EXT
      else
         STRING:=alltrim(str(TEXTO[I]))+_CR
      end
+     STRING:=strtran(STRING,"\n",HB_OSNEWLINE())
      FWRITE(FP,STRING,LEN(STRING))
      ++LIN
   END
@@ -1376,7 +1338,7 @@ cFUN:={"FNA","FNA","FNA","FNA","FNA",;
        "FNC","FNC","FNC","FNC","FNC",;
        "FND","FND","FND","FND","FND","FND",;
        "FNE","FNE","FNE","FNE","FNE","FNE",;
-       "FNF","FNF","FNF","FNF","FNF",;
+       "FNF","FNF","FNF","FNF","FNF","FNF",;
        "FNG","FNG","FNG","FNG","FNG","FNG",;
        "FNH","FNH","FNH","FNH","FNH",;
        "FNI","FNI","FNI","FNI","FNI","FNI","FNI","FNI",;
@@ -1391,7 +1353,7 @@ DICC:={"NT","I","VAR","MOV","~",;   // A
        "POOL","LOOP","ROUND","UTF8","ANSI",;           // C
        "CAT","MATCH","LEN","SUB","AT","RANGE",;  // D
        "AF","RAT","PTRP","PTRM","CP","TR",;  // E
-       "TK","LETK","LET","COPY","FILE",;    // F     
+       "TK","LETK","LET","COPY","FILE","GLOSS",;    // F     
        "RP","TRI","LTRI","RTRI","UP","LO",;    // G
        "TRE","INS","DC","RPC","ONE",;       // H
        "VAL","STR","CH","ASC","LIN","PC","PL","PR",;    // I
@@ -1707,7 +1669,7 @@ aadd(pila2,"(")
          elseif m=="POOL" .or. m=="CLEAR" .or. m=="JNZ" .or. m=="ELSE" .or. m=="ENDIF"
             ;
             
-         elseif m=="CH" .or. m=="STR"
+         elseif m=="CH" .or. m=="STR" .or. m=="GLOSS"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: ESPERO UN ARGUMENTO ("+m+")")
@@ -2548,6 +2510,13 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                end
             elseif m=="FILE"
                AADD(pila,FILENAME+chr(0))
+            elseif m=="GLOSS"
+               n:=SDP(pila)
+               if valtype(n)=="N"
+                  n:=alltrim(str(n))
+               end
+               n:=strtran(n,chr(0),"")
+               AADD(pila,GLOSA(n))
             end
          
          elseif m=="FNG"
@@ -2597,7 +2566,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                end
              //  o:=strtran(o,'"',"")
                o:=strtran(o,chr(0),"")
-               AADD(pila,o+chr(0))
+               AADD(pila,o)
             end
 
          elseif m=="FNH"
@@ -3231,8 +3200,8 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
       ACOPY(tBUFFER,@BUFFER)
       SWEDIT:=.F.
    end */
-   
-   if len(pila)>1 //.or. len(pila)==0
+   XLEN:=len(pila)
+   if XLEN>1 //.or. len(pila)==0
     /*  ? "PILA TIENE PROBLEMAS"
       for i:=1 to len(pila)
          ? ">>>>",pila[i]
@@ -3241,9 +3210,210 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
       _ERROR("EVALUADOR: EXPRESION MAL FORMADA (QUEDAN "+hb_ntos(len(pila))+" RESULTADOS EN PILA).")
       RETURN .F.
    end
-//RETURN iif(len(pila)==1,pila[1],"")
-RETURN iif(len(pila)>=1,pila[len(pila)],"")
 
+RETURN iif(XLEN>=1,pila[XLEN],"")
+
+FUNCTION GLOSA(CIFRA)
+LOCAL cDec,cNum,xPos,c,c1,c2,cCIF,decimal,num,N,desde,name,cif,l,i
+LOCAL AX,BX,CX,DX,EX,FX
+AX:={"uno","dos","tres","cuatro","cinco","seis","siete","ocho","nueve"}
+BX:={"once","doce","trece","catorce","quince","dieciseis","diecisiete","dieciocho","diecinueve"}
+CX:={"","veinti","treinta y ","cuarenta y ","cincuenta y ","sesenta y ","setenta y ","ochenta y ","noventa y "}
+
+DX:={"diez","veinte","treinta","cuarenta","cincuenta","sesenta","setenta","ochenta","noventa"}
+
+FX:={"ciento","docientos","trecientos","cuatrocientos","quinientos","seicientos","setecientos","ochocientos","novecientos"}
+
+EX :={"","mil","millones","mil millones","billones","mil billones","trillones","mil trillones","cuatrillones","mil cuatrillones",;
+      "quintillones","mil quintillones","sextillones","mil sextillones","septillones","mil septillones","octillones","mil octillones",;
+      "nonillones","mil nonillones","decillon","mil decillones"}
+
+cNum:=alltrim(CIFRA)            
+if ISTNUMBER(cNum)==1
+   cDec:=""
+   xPos:=at(".",cNum)
+   if xPos>0
+      cDec:=substr(substr(cNum,xPos+1,len(cNum)),1,2)
+      cNum:=substr(cNum,1,xPos-1)
+   end
+
+   decimal:=""
+   if val(cDec)>0
+      if cDec!="00"
+         decimal:=" con "
+         num:=val(cDec)
+         if num<10
+            decimal+=AX[num]
+         elseif num<20
+            //num:=hb_ntos(num)
+            if cDec=="10"
+               decimal+="diez"
+            else 
+               decimal+=BX[val(right(cDec,1))]
+            end
+         else
+            //c:=hb_ntos(num)
+            if val(substr(cDec,2,1))==0
+               decimal+=DX[val(left(cDec,1))]
+            else
+               c1:=val(right(cDec,1))
+               //if c1>1
+                  decimal+=CX[val(left(cDec,1))]+AX[c1]
+              // else
+              //    N+=CX[val(left(c,1))]+"un "+name
+              // end
+            end
+         end
+      end
+   end
+ //  ? decimal
+   l:=len(cNum)
+   cif:={}
+   while l>0
+      if l-2>0
+         aadd(cif,val(substr(cNum,l-2,l)))
+      else
+         aadd(cif,val(substr(cNum,1,l)))
+      end
+      cNum:=substr(cNum,1,l-3)
+      l:=len(cNum)
+   //   ? cif[len(cif)]
+   end
+   desde:=l:=len(cif)
+   nCIF:=""
+
+   for i:=l to 1 step -1
+      c:=cif[i]
+      N:=""
+      if c>0
+         if desde>0
+            name:=EX[desde]+" "
+         else
+            name:=""
+         end
+         
+         if c<10
+            if c==1 
+               if desde>=2
+                //  c2:=at("(",name)
+                //  if c2>0
+                //     N+="un "+left(name,c2-1)+" "
+                //  else
+                   if name!="mil "
+                     c2:=at("es",name)
+                     if c2>0
+                        N+="un "+left(name,c2-1)+" "
+                     else
+                        N+="un "+name
+                     end
+                   else
+                     N+=name  
+                   end
+               else
+                  N+="uno" //+name
+               end
+            else
+               N+=AX[c]+" "+name
+            end
+         elseif c<20
+            c:=hb_ntos(c)
+            if c=="10"
+               N+="diez "+name
+            else 
+               N+=BX[val(right(c,1))]+" "+name
+            end
+         elseif c<100
+            c:=hb_ntos(c)
+            if val(substr(c,2,1))==0
+               N+=DX[val(left(c,1))]+" "+name
+            else
+               c1:=val(right(c,1))
+               if c1>1
+                  N+=CX[val(left(c,1))]+AX[c1]+" "+name
+               else
+                  if desde>=2
+                     N+=CX[val(left(c,1))]+"un "+name
+                  else
+                     N+=CX[val(left(c,1))]+"uno"
+                  end
+               end
+            end
+         else   // mayor que 100
+            c:=hb_ntos(c)
+            if val(substr(c,2,len(c)))==0
+               if left(c,1)=="1"
+                  N+="cien "+name
+               else
+                  N+=FX[val(left(c,1))]+" "+name
+               end
+            else   
+               N+=FX[val(left(c,1))]+" "
+               c:=substr(c,2,2)
+               c1:=val(c)
+          //  ? c1
+               if c1<10
+                  if c1==1 
+                     if desde>=2
+                        c2:=at("es",name)
+                        if c2>0
+                           N+="un "+left(name,c2-1)+" "
+                        else
+                        
+                           N+="un "+name
+                        end
+                     else
+                        N+="uno "//+name
+                     end
+                  else
+                    // ? c1
+                     N+=AX[c1]+" "+name
+                  end
+               elseif c1<20
+                  if c=="10"
+                     N+="diez "+name
+                  else 
+                     N+=BX[val(right(c,1))]+" "+name
+                  end
+               elseif c1<100
+                  if val(substr(c,2,1))==0
+                     N+=DX[val(left(c,1))]+" "+name
+                  else
+                     c2:=val(right(c,1))
+                     if c2==1
+                        if desde>=2
+                           N+=CX[val(left(c,1))]+"un "+name
+                        else
+                           N+=CX[val(left(c,1))]+"uno"
+                        end
+                     else
+                        N+=CX[val(left(c,1))]+AX[c2]+" "+name
+                     end
+                  end
+               end
+            end  
+         end
+      else
+         if l==1
+            N+="cero"
+         end
+      end
+      if desde>2
+         if cif[i-1]>0
+            if rat("mil ",N)>0
+               N:=substr(N,1,rat("mil ",N)+3)
+            end
+         end
+      end
+      nCIF:=nCIF+N
+      --desde
+   end
+   nCIF:=alltrim(nCIF)+decimal
+
+else
+   nCIF:= " ** no se puede convertir ["+cNum+"] ** " 
+end
+
+RETURN nCIF
 
 PROCEDURE _ERROR(msg)
    outstd(_CR+msg+_CR+_CR)
@@ -3341,7 +3511,7 @@ DICC:={"LN","LOG","SQRT","ABS","INT","CEIL","FLOOR","SGN","ROUND","SIN","COS","T
        "EXP","INV","RP","CAT","LEN","SUB","AT","AF","RAT","PTRP","PTRM","CP","TR","TK","VAL","CH","LIN","PC","PL","PR","IF",;
        "TRE","INS","DC","RPC","ONE","ASC","TRI","LTRI","RTRI","I","INC","DEC","IFLE","IFGE","LETK","MATCH","LET","DEFT",;
        "NT","POOL","LOOP","MOV","VAR","NOP","COPY","AND","OR","XOR","NOT","BIT","ON","OFF","BIN","HEX","OCT","~",;
-       "JNZ","ELSE","ENDIF","CLEAR","RANGE","FILE","STR","UTF8","ANSI",;
+       "JNZ","ELSE","ENDIF","CLEAR","RANGE","FILE","STR","UTF8","ANSI","GLOSS",;
        "FNA","FNB","FNC","FND","FNE","FNF",;
        "FNH","FNI","FNJ","FNK","FNL","FNM","FNN"}
 
@@ -4038,8 +4208,8 @@ char *fun_xmoney (double numero, const char *tipo, const char *cblanc, uint16_t 
    buf = buffer;
    
    if( numero < 0 ) {
-   	   swSign=1;
-   	   numero *= -1;
+      swSign=1;
+      numero *= -1;
    }
 
    uint16_t size = sprintf(buf,"%.*lf",decimales, numero);

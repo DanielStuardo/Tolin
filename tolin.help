@@ -22,6 +22,10 @@ Modo de uso:
    -B 'v0 v1..'    añade valores al BUFFER, que puede ser usado por LET y LIN.                             
                    Usar el BUFFER para guardar valores es como usar variables globales. Uselas.
    -f              indica el archivo a procesar. Puede añadir una ruta.
+   -f foo          Puede usar este archivo ficticio para procesar comandos sin la presencia de datos de un
+                   archivo. Ejemplo: 
+                    tolin -f foo 'macros...'
+                    
    -F              procesa un lote de archivos, indicados con comodines. Ejemplo: *.txt.
    -t              indica un archivo de macros.
    -b              fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que
@@ -611,6 +615,12 @@ Modo de uso:
 
    Funciones utilitarias.
 
+
+   GLOSS(N)          Convierte un número en palabras. Si "N" es un string,
+                     acepta a un número de 69 dígitos (mil decillones).
+                     Si "N" es un número "numérico", el máximo aceptado
+                     rodea los 9 mil millones, que es el límite natural
+                     de Harbour para procesar números :(
 
    MON(V,S,M,N)      Da formato moneda al número en "V", con un signo 
                      monetario "S", un ancho "M", y "N" decimales. El
