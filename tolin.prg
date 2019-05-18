@@ -43,7 +43,7 @@ public STRING
 public BUFFER:={}
 public SWNOTNUL:=.F.
 public SWKEEPVACIO:=.F.
-public SWNOBUFFER:=.F.
+public SWBUFFER:=.F.
 public SWRESET:=.F.
 
 numParam:=PCOUNT()
@@ -98,7 +98,9 @@ nIncremento:=1
 nHEADVAR:=1
 swStat:=.F.
 swManual:=.F.
-BUFFERLINEA:=256
+swComando:=.F.
+cCOMANDO:=""
+BUFFERLINEA:=1024
 inputMultiple:={}
 
 
@@ -140,6 +142,16 @@ inputMultiple:={}
             swImpar:=.F.
          end
          swPar:=.T.
+      elseif STRING=="-d"  // define precision numerica
+         if i==len(_arr_par)
+            outstd(_CR+"Parametro '-d' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         nPrecision:=val(_arr_par[++i])
+         SET DECIMAL TO nPrecision
+         nPrecision:=0
+                  
       elseif STRING=="-H"   // solo un encabezado de n líneas
          if i==len(_arr_par)
             outstd(_CR+"Parametro '-H' incompleto."+_CR+;
@@ -222,6 +234,18 @@ inputMultiple:={}
          inputFile:=""
          swMInput:=.T.
          swInput:=.F.
+      elseif STRING=="-c"   // procesa un comando del sistema operativo.
+         if i==len(_arr_par)
+            outstd(_CR+"Parametro '-c' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         cCOMANDO:=_arr_par[++i]
+         inputMultiple:={}
+         aadd(inputMultiple,cCOMANDO)
+         swInput:=.T.
+         swComando:=.T.
+         
       elseif STRING=="-f"  // archivo input
          if i==len(_arr_par)
             outstd(_CR+"Parametro '-f' incompleto."+_CR+;
@@ -397,7 +421,7 @@ if swHelp
    outstd(hb_utf8tostr("   -t          indica un archivo de macros.")+_CR)
    outstd(hb_utf8tostr("   -b          fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que")+_CR)
    outstd(hb_utf8tostr("               contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13.")+_CR+_CR)
-   outstd(hb_utf8tostr("  Consulte 'tolin -man' para funciones macros y ejemplos.")+_CR+_CR)
+   outstd(hb_utf8tostr("  Consulte 'tolin -man' por otras opciones, funciones macros y ejemplos.")+_CR+_CR)
    outstd(hb_utf8tostr("  AUTOR.")+_CR)
    outstd(hb_utf8tostr("           Mr. Dalien, mayo de 2019. daniel.stuardo@gmail.com")+_CR)
    outstd(hb_utf8tostr("           Bugs, consultas, al mail.")+_CR+_CR)
@@ -410,6 +434,7 @@ end
    quit
 end*/
 
+IF !swComando
 if swInput
    if !file(inputFile) .and. inputFile!="foo"
       outstd(_CR+"No existe el archivo de entrada '"+inputFile+"'"+_CR+_CR+"Tolin aborta"+_CR)
@@ -428,6 +453,7 @@ else
       quit
    end
 end
+END
 if !swStat
    if swMacro
       if !file(_file)
@@ -453,6 +479,8 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 FOR nFile:=1 to len(inputMultiple)
 
 inputFile:=inputMultiple[nFile]
+
+IF !swComando
 
 if lower(inputFile)!="foo"
 /* VERIFICA TIPO DE ARCHIVO Y OBTIENE DATOS DEL ARCHIVO */
@@ -600,11 +628,29 @@ else   // archivo FOO
    nIncremento:=1
    STRING:={" "}
 end
+
+ELSE  // comando del sistema
+   if OPERATING_SYSTEM=="LINUX" 
+      cBUFF:=FUNFSHELL(inputFile,3)
+   elseif OPERATING_SYSTEM=="DARWIN"
+      cBUFF:=FUNFSHELL(inputFile,3)
+   end
+   NUMCAR:=LEN(cBUFF)
+   NL:=mlcount(cBUFF,1024)
+   STRING:=GETLINEAS(cBUFF,NL,NUMCAR,BUFFERLINEA)
+   lini:=1
+   lfin:=len(STRING)
+  /* for i:=lini to lfin
+      ? STRING[i]
+   end
+   inkey(0)*/
+   nIncremento:=1
+END
 /********/
 
 SWNOTNUL:=.F.
 SWKEEPVACIO:=.F.
-SWNOBUFFER:=.F.
+SWBUFFER:=.F.
 SWRESET:=.F.
 
 /* LECTURA DEL ARCHIVO */
@@ -690,7 +736,8 @@ end
           end
           if valtype(RX)=="N"
              IF ABS(RX)>INFINITY().or. (ABS(RX)>0.and.ABS(RX)<0.000000000001)
-                RX:=alltrim(str(D2E(RX,5)))
+//                ? "RX=",RX," D2E=",D2E(RX,5)
+                RX:=D2E(RX,5)
              else
                 RX:=alltrim(str(RX))
              end
@@ -747,12 +794,10 @@ if !SWRESET
          _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
          quit
       end
- /*     if nHEADVAR>1   // reset el buffer
-         BUFFER:=array(len(tmpBUFFER))
-         acopy(tmpBUFFER,BUFFER)
-      else
-         BUFFER:={}
-      end */
+   elseif nHEADVAR>0 .and. SWBUFFER  // imprimo las variables
+      for i:=1 to len(BUFFER)
+         outstd(BUFFER[i]+" ")
+      end
    end
 end
 
@@ -876,14 +921,15 @@ if "void" $ DX
    SWKEEPVACIO:=.T.
    DX:=strtran(DX,"void","")
 end
-if "nobuff" $ DX
-   SWNOBUFFER:=.T.
-   DX:=strtran(DX,"nobuff","")
+if "buff" $ DX
+   SWBUFFER:=.T.
+   DX:=strtran(DX,"buff","")
 end
 if "reset" $ DX
    SWRESET:=.T.
    DX:=strtran(DX,"reset","")
 end
+
 
 ////DX:=strtran(DX,"?(","IF(")
 DX:=strtran(DX,"match{","MATCH(#,")
@@ -1261,7 +1307,12 @@ while i <= long
             _ERROR("CONV: NO ES UN NUMERO VALIDO: "+num)
             RETURN {}  // error
          else
-            AADD(R,val(num))
+            num:=val(num)
+            IF ABS(num)>INFINITY().or. (ABS(num)>0.and.ABS(num)<0.000000000001)
+               AADD(R,D2E(num))
+            else
+               AADD(R,num)
+            end
          end
       end
 
@@ -1781,7 +1832,7 @@ RETURN p2
 
 
 FUNCTION _EVALUA_EXPR(p,par,ITERACION,tBUFFER,FILENAME)
-LOCAL res,pila,m,n,o,h,i,j,id:=0,ids:=0,c1,c2,c3,fp,str,nLength,xvar,NUMTOK:=0
+LOCAL res,pila,m,n,o,h,i,j,id:=0,ids:=0,c1,c2,c3,fp,str,nLength,xvar,NUMTOK:=0,ope:=0
 LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tmpPos
    pila:={}
    pilaif:={}
@@ -2542,7 +2593,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
             elseif m=="GLOSS"
                n:=SDP(pila)
                if valtype(n)=="N"
-                  n:=alltrim(str(n))
+                  IF ABS(n)>INFINITY().or. (ABS(n)>0.and.ABS(n)<0.000000000001)
+                     n:=D2E(n,10)
+                  else
+                     n:=alltrim(str(n))
+                  end
                end
                n:=strtran(n,chr(0),"")
                AADD(pila,GLOSA(n))
@@ -3257,7 +3312,11 @@ EX :={"","mil","millones","mil millones","billones","mil billones","trillones","
       "quintillones","mil quintillones","sextillones","mil sextillones","septillones","mil septillones","octillones","mil octillones",;
       "nonillones","mil nonillones","decillon","mil decillones"}
 
-cNum:=alltrim(CIFRA)            
+if ISNOTATION(CIFRA)==1
+   cNum:=alltrim(str(E2D(CIFRA)))
+else
+   cNum:=alltrim(CIFRA)
+end
 if ISTNUMBER(cNum)==1
    cDec:=""
    xPos:=at(".",cNum)
@@ -4410,7 +4469,16 @@ HB_FUNC ( D2E )
   hb_retc( buf );
   free(buf);
 }
-
+/*
+HB_FUNC ( CIF2STR )
+{
+   long long nNum = hb_parnd(1);
+   char *buf = (char *) calloc(64,1);
+   uint16_t size = sprintf(buf,"%.*lld",2, nNum);
+   printf("%s\n\n\n",buf);
+   hb_retc ( buf );
+   free(buf);
+}*/
 HB_FUNC ( E2D )
 {
    const char *linea = hb_parc(1);
@@ -4599,6 +4667,78 @@ HB_FUNC( CMDSYSTEM )
   hb_retni(ret);
 }
 
+//STRING:=COMGETLINEAS(cBUFF,NUMCAR,BUFFERLINEA) 
+/*HB_FUNC( COMGETLINEAS )
+{
+   PHB_ITEM pSTRING = hb_param( 1, HB_IT_STRING );
+   long nTotCar  = hb_parnl( 2 );
+   long nMax  = hb_parnl( 3 );
+
+   PHB_ITEM pCWM = hb_itemArrayNew( 0 ); // CWM
+   const char * STRING = hb_itemGetCPtr( pSTRING );
+   long j;
+   long totalCar = 0;
+   int sw=0;
+   int swError=0;
+   if (nMax<=0){
+      nMax=1024;
+   }
+      char * cBuff;
+      sw=1;
+     // i=0;
+      while( totalCar <= nTotCar ) {
+         ///printf("DATO----- [%c] %d \n",*STRING,(int)*STRING);
+         if (sw){
+            cBuff = (char *)calloc(nMax+nMax,1);
+            j=0;
+            sw=0;      
+         }
+         if ( *STRING!='\n' ){
+           // printf("Asigna STRING...\n");
+            if(j>nMax+nMax){
+               
+               swError=1;
+               j=nMax+nMax-1;
+               break;
+            }
+            cBuff[j++] = *STRING;
+           // printf("Asignado!!...\n");
+            ++totalCar;
+            ++STRING;
+         }else{
+            ++totalCar;
+            ++STRING;  // nos saltamos '\n'
+            if(j>=0){
+               cBuff[j]='\0';
+               const char * pBuffer = cBuff;
+               PHB_ITEM pC  = hb_itemArrayNew( 1 );
+               hb_arraySetC( pC, 1, (const char *) pBuffer  );
+               hb_arrayAdd( pCWM, pC );
+               hb_itemRelease( pC );
+               free ( cBuff );
+            }else{ 
+               PHB_ITEM pC  = hb_itemArrayNew( 1 );
+               hb_arraySetC( pC, 1, (const char *) "ERROR-DE-FORMATO-NO-RECONOCIDO" );
+               hb_arrayAdd( pCWM, pC );
+               hb_itemRelease( pC );
+               free( cBuff );
+               break;
+            }            
+            sw=1;
+         }
+      }
+      if (swError) {
+         PHB_ITEM pC  = hb_itemArrayNew( 1 );
+         hb_arraySetC( pC, 1, (const char *) "ERROR-DE-FORMATO-NO-RECONOCIDO" );
+         hb_arrayAdd( pCWM, pC );
+         hb_itemRelease( pC );
+         free ( cBuff );
+      }
+   
+   hb_itemClear( pSTRING );
+   hb_itemReturnRelease( pCWM );
+}
+*/
 HB_FUNC( GETLINEAS )
 {
    PHB_ITEM pSTRING = hb_param( 1, HB_IT_STRING );
