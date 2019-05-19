@@ -45,6 +45,7 @@ public SWNOTNUL:=.F.
 public SWKEEPVACIO:=.F.
 public SWBUFFER:=.F.
 public SWRESET:=.F.
+public DEFTOKEN:=" "   // token por defecto.
 
 numParam:=PCOUNT()
 
@@ -99,6 +100,10 @@ nHEADVAR:=1
 swStat:=.F.
 swManual:=.F.
 swComando:=.F.
+swBuscaLinea:=.F.
+swBuscaExacta:=.F.
+SWSENSITIVE:=.T.
+cBUSCASTR:=""
 cCOMANDO:=""
 BUFFERLINEA:=1024
 inputMultiple:={}
@@ -245,7 +250,52 @@ inputMultiple:={}
          aadd(inputMultiple,cCOMANDO)
          swInput:=.T.
          swComando:=.T.
-         
+      
+      elseif STRING=="-ss"     // busca un string y devuelve sus líneas para proceso
+         if i==len(_arr_par)
+            outstd(_CR+"Parametro '-ss' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         cBUSCASTR:=_arr_par[++i]
+         swBuscaLinea:=.T.
+         swBuscaExacta:=.F.
+      
+      elseif STRING=="-se"     // busca un string y devuelve sus líneas para proceso
+         if i==len(_arr_par)
+            outstd(_CR+"Parametro '-se' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         cBUSCASTR:=_arr_par[++i]
+         swBuscaExacta:=.T.
+         swBuscaLinea:=.F.
+      
+      elseif STRING=="-si"     // busqueda case insensitive
+         if !swBuscaLinea .and. !swBuscaExacta
+            outstd(_CR+"No se ha declarado '-ss' ni 'se'."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         cBUSCASTR:=upper(cBUSCASTR)
+         SWSENSITIVE:=.F.
+           
+      elseif STRING=="-seed"   // añade semilla random
+         if i==len(_arr_par)
+            outstd(_CR+"Parametro '-seed' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         HB_RANDOMSEED(val(_arr_par[++i]))
+      
+      elseif STRING=="-ts"   // separador de token
+         if i==len(_arr_par)
+            outstd(_CR+"Parametro '-ts' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         DEFTOKEN:=_arr_par[++i]
+
       elseif STRING=="-f"  // archivo input
          if i==len(_arr_par)
             outstd(_CR+"Parametro '-f' incompleto."+_CR+;
@@ -646,6 +696,7 @@ ELSE  // comando del sistema
    inkey(0)*/
    nIncremento:=1
 END
+
 /********/
 
 SWNOTNUL:=.F.
@@ -692,8 +743,6 @@ if valtype(R)=="L"
    return NIL
 end
 
-DEFTOKEN:=" "   // token por defecto.
-
 /***********/
 //CX:=space(BUFFERLINEA)
 ////BUFFER:={}
@@ -711,6 +760,7 @@ elseif swImpar
    nIncremento:=2
 end
 
+if swBuscaLinea .or. swBuscaExacta
    for i:=lini to lfin step nIncremento
       /* BX:=""
        nSavePos := FSEEK( fp, 0, 1 )
@@ -725,6 +775,49 @@ end
        ///PROCESA BX
        RX:=_EVALUA_EXPR(@R,BX,i,@BUFFER)
 */
+     //  vefirica si tiene que buscar lineas antes de procesarlas:
+      if swBuscaLinea
+         if SWSENSITIVE
+            if at(cBUSCASTR,STRING[i])==0
+               loop
+            end
+         else
+            if at(cBUSCASTR,upper(STRING[i]))==0
+               loop
+            end
+         end
+         
+      elseif swBuscaExacta
+         if SWSENSITIVE
+            id:=numat(cBUSCASTR,STRING[i])
+         else
+            id:=numat(cBUSCASTR,upper(STRING[i]))
+         end
+         //? "ID=",id
+         if id>0
+            swFound:=.F.
+            tmpPos:=0
+            //while j<=id
+            for j:=1 to id
+               if SWSENSITIVE
+                  tmpPos:=ATNUM(cBUSCASTR,STRING[i],j)
+               else
+                  tmpPos:=ATNUM(cBUSCASTR,upper(STRING[i]),j)
+               end
+               tmpPos:=BUSCACOMPLETA(tmpPos,STRING[i],len(cBUSCASTR))
+             //  ? "TMP=",tmpPos
+               if tmpPos>0
+                  swFound:=.T.
+                  j:=10000
+               end
+            end
+            if !swFound
+               loop
+            end
+         else
+            loop
+         end
+      end
      //  if swConvert
           RX:=_EVALUA_EXPR(@R,STRING[i],i,@BUFFER,inputFile)
      //  else
@@ -760,6 +853,72 @@ end
     //      BUFFER:={}
     //   end
    end
+else
+   for i:=lini to lfin step nIncremento
+     //  vefirica si tiene que buscar lineas antes de procesarlas:
+      if swBuscaLinea
+         if SWSENSITIVE
+            if at(cBUSCASTR,STRING[i])==0
+               loop
+            end
+         else
+            if at(cBUSCASTR,upper(STRING[i]))==0
+               loop
+            end
+         end
+         
+      elseif swBuscaExacta
+         if SWSENSITIVE
+            id:=numat(cBUSCASTR,STRING[i])
+         else
+            id:=numat(cBUSCASTR,upper(STRING[i]))
+         end
+         if id>0
+            swFound:=.F.
+            tmpPos:=0
+            for j:=1 to id
+               if SWSENSITIVE
+                  tmpPos:=ATNUM(cBUSCASTR,STRING[i],j)
+               else
+                  tmpPos:=ATNUM(cBUSCASTR,upper(STRING[i]),j)
+               end
+               tmpPos:=BUSCACOMPLETA(tmpPos,STRING[i],len(cBUSCASTR))
+             //  ? "TMP=",tmpPos
+               if tmpPos>0
+                  swFound:=.T.
+                  j:=10000
+               end
+            end
+            if !swFound
+               loop
+            end
+         else
+            loop
+         end
+      end
+          RX:=_EVALUA_EXPR(@R,STRING[i],i,@BUFFER,inputFile)
+          if valtype(RX)=="L"
+             break
+          end
+          if valtype(RX)=="N"
+             IF ABS(RX)>INFINITY().or. (ABS(RX)>0.and.ABS(RX)<0.000000000001)
+                RX:=D2E(RX,5)
+             else
+                RX:=alltrim(str(RX))
+             end
+             fwrite(1,RX+_CR)
+          else
+             if len(RX)>0
+                RX:=strtran(RX,chr(0),"")
+                fwrite(1,hb_strtoutf8(strtran(RX,"\n",hb_osnewline()))+_CR)
+             else
+                if SWKEEPVACIO
+                   fwrite(1,_CR)
+                end
+             end
+          end
+   end
+end
    CX=""
    if SWRESET
       if len(BUFFER)>=nHEADVAR
@@ -804,6 +963,7 @@ end
 return NIL
 
 /** funciones Harbour **/
+
 FUNCTION MemoUDF( nMode, nLine, nCol )
 LOCAL nKey := LASTKEY(),i,j,c
 LOCAL nRetVal := ME_DEFAULT // Default return action
@@ -940,8 +1100,6 @@ DX:=strtran(DX,"ins{","INS(#,")
 DX:=strtran(DX,"range{","RANGE(#,") 
 DX:=strtran(DX,"#{","LIN(")  // linea
 DX:=strtran(DX,"tre{","TRE(#,")
-DX:=strtran(DX,"(&","VAL(")
-DX:=strtran(DX,"($","STR(")
 //DX:=strtran(DX,"{","CH(")  // chr
 //DX:=strtran(DX,"&{","ASC(")  // asc
 DX:=strtran(DX,"{*","CP(#,")
@@ -1420,7 +1578,7 @@ cFUN:={"FNA","FNA","FNA","FNA","FNA",;
        "FNE","FNE","FNE","FNE","FNE","FNE",;
        "FNF","FNF","FNF","FNF","FNF","FNF",;
        "FNG","FNG","FNG","FNG","FNG","FNG",;
-       "FNH","FNH","FNH","FNH","FNH",;
+       "FNH","FNH","FNH","FNH","FNH","FNH",;
        "FNI","FNI","FNI","FNI","FNI","FNI","FNI","FNI",;
        "FNJ","FNJ","FNJ","FNJ","FNJ","FNJ","FNJ","FNJ",;
        "FNK","FNK","FNK","FNK",;
@@ -1434,8 +1592,8 @@ DICC:={"NT","I","VAR","MOV","~",;   // A
        "CAT","MATCH","LEN","SUB","AT","RANGE",;  // D
        "AF","RAT","PTRP","PTRM","CP","TR",;  // E
        "TK","LETK","LET","COPY","FILE","GLOSS",;    // F     
-       "RP","TRI","LTRI","RTRI","UP","LO",;    // G
-       "TRE","INS","DC","RPC","ONE",;       // H
+       "RP","TRI","LTRI","RTRI","UP","LOW",;    // G
+       "TRE","INS","DC","RPC","ONE","RND",;       // H
        "VAL","STR","CH","ASC","LIN","PC","PL","PR",;    // I
        "MSK","MON","SAT","DEFT","IF","IFLE","IFGE","CLEAR",; // J
        "NOP","AND","OR","XOR",;    // K
@@ -1711,7 +1869,7 @@ aadd(pila2,"(")
             else
                aadd(pila,"N")
             end
-         elseif m=="UP".or.m=="LO".or.m=="TRI".or.m=="LTRI".or.m=="RTRI".or.m=="BIN".or.m=="HEX".or.m=="UTF8".or.m=="ANSI"
+         elseif m=="UP".or.m=="LOW".or.m=="TRI".or.m=="LTRI".or.m=="RTRI".or.m=="BIN".or.m=="HEX".or.m=="UTF8".or.m=="ANSI"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
@@ -1756,7 +1914,7 @@ aadd(pila2,"(")
                RETURN .F.
             end
             aadd(pila,"C") // solo para que pase el analisis
-         elseif m=="LEN".or. m=="ASC" /*.or. m=="INC"*/.or.m=="DEC" .or. m=="VAR" .or. m=="NOT"
+         elseif m=="LEN".or. m=="ASC" .or. m=="RND".or.m=="DEC" .or. m=="VAR" .or. m=="NOT"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
@@ -2080,6 +2238,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
             elseif m=="VAR"
                o:=SDP(pila)
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                if o>=1 .and. o<=10
@@ -2093,6 +2252,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)
                o:=SDP(pila)
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                if o>=1 .and. o<=10
@@ -2196,9 +2356,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,ROUND(n,o))
@@ -2208,6 +2370,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                   n:=SDP(pila)
                 
                   if valtype(n)!="N"
+                     n:=strtran(n,chr(0),"")
                      n:=val(n)
                   end
                /// ? "n = ",n ; inkey(0)
@@ -2310,9 +2473,13 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)
                o:=SDP(pila)
             //   ? "o=",o,"n=",n,"m=",m; inkey(0)
-               if valtype(m)!="N" .or. valtype(n)!="N"
-                  _ERROR("EVALUADOR: NECESITO INDICES NUMERICOS EN SUB(#, <<M>>, <<N>>)")
-                  return .F.
+               if valtype(m)!="N"
+                  m:=strtran(m,chr(0),"")
+                  m:=val(m)
+               end
+               if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
+                  n:=val(n)
                end
                if valtype(o)=="N"
                   o:=alltrim(str(o))
@@ -2354,9 +2521,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                end
                h:=strtran(h,chr(0),"")
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                tmpPos:=POSRANGE(chr(n),chr(o),h,,tmpPos)
@@ -2430,8 +2599,8 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)
              //  ? "O=",o," N=",n; inkey(0)
                if valtype(o)!="N"
-                  _ERROR("EVALUADOR: ESPERO UN NUMERO EN CP(#, <<N>>)")
-                  return .F.
+                  o:=strtran(o,chr(0),"")
+                  o:=val(o)
                end
                if valtype(n)=="N"
                   n:=alltrim(str(n))
@@ -2460,6 +2629,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                   n:=alltrim(str(n))
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                n:=strtran(n,chr(0),"")
@@ -2472,6 +2642,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                   n:=alltrim(str(n))
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
              //  n:=strtran(n,'"',"")
@@ -2488,6 +2659,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
             //   ? "o=",o,"n=",n,"m=",m; inkey(0)
                if valtype(m)!="N"
+                  m:=strtran(m,chr(0),"")
                   m:=val(m)
                end
               /* if valtype(n)=="N"
@@ -2505,13 +2677,13 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                   return .F.
                else
                   n:=alltrim(token(o,DEFTOKEN,m))
-                  if ISTNUMBER(n)==1
+/*                  if ISTNUMBER(n)==1
                      AADD(pila,val(n))
                   elseif ISNOTATION(n)==1
                      AADD(pila,e2d(n))
-                  else
+                  else*/
                      AADD(pila,n+chr(0))
-                  end
+//                  end
                end               
 
             elseif m=="LET"
@@ -2521,6 +2693,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                   h:=alltrim(str(h))
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                h:=strtran(h,chr(0),"")
@@ -2536,6 +2709,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)  // token 1. debe ser un numero, indice de token
                o:=SDP(pila)  // linea
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                o:=strtran(o,chr(0),"")
@@ -2628,19 +2802,21 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=strtran(n,chr(0),"")
                AADD(pila,rtrim(n)+chr(0))
 
-            elseif m=="UP".or. m=="LO"
+            elseif m=="UP"
                n:=SDP(pila)
                if valtype(n)=="N"
                   n:=alltrim(str((n)))
-            //   else
-            //      n:=strtran(n,'"',"")
                end
                n:=strtran(n,chr(0),"")
-               if m=="UP"
-                  AADD(pila,upper(n)+chr(0))
-               else
-                  AADD(pila,lower(n)+chr(0))
+               AADD(pila,upper(n)+chr(0))
+               
+            elseif m=="LOW"
+               n:=SDP(pila)
+               if valtype(n)=="N"
+                  n:=alltrim(str((n)))
                end
+               n:=strtran(n,chr(0),"")
+               AADD(pila,lower(n)+chr(0))
             
             elseif m=="RP"
                o:=SDP(pila)
@@ -2703,8 +2879,8 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)
                o:=SDP(pila)
                if valtype(m)!="N"
-                  _ERROR("EVALUADOR: NECESITO LA POSICION NUMERICA EN INS(#,M, <<N>>)")
-                  return .F.
+                  m:=strtran(m,chr(0),"")
+                  m:=val(m)
                end 
                if valtype(n)=="N"
                   n:=alltrim(str(n))
@@ -2765,6 +2941,14 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=strtran(n,chr(0),"")
                o:=strtran(o,chr(0),"")
                AADD(pila,CHARREM(n,o)+chr(0))
+            elseif m=="RND"
+               n:=SDP(pila)
+               if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
+                  n:=val(n)
+               end
+               AADD(pila,HB_RANDOM()*n)
+
             end
          
          elseif m=="FNI"
@@ -2774,6 +2958,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)
                //? "N=",n; inkey(0)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                if n>0 .and. n<=LEN(tBUFFER)
@@ -2787,6 +2972,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
             elseif m=="CH"
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                  // if n<=0 .or. n>255
                  //    AADD(pila,"null")
@@ -2830,6 +3016,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                   n:=alltrim(str(n))
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                n:=strtran(n,chr(0),"")
@@ -2877,9 +3064,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                n:=SDP(pila)  // relleno y signo moneda
                o:=SDP(pila)  // variable: debe ser numerico
                if valtype(h)!="N"
-                  m:=val(m)
+                  h:=strtran(h,chr(0),"")
+                  h:=val(h)
                end
                if valtype(m)!="N"
+                  m:=strtran(m,chr(0),"")
                   m:=val(m)
                end
                if valtype(n)=="N"
@@ -2890,6 +3079,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                c1:=substr(n,1,1)    // relleno
                c2:=substr(n,2,len(n)) // tipo moneda
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                AADD(pila,XFUNMONEY(o,c2,c1,h,m)+chr(0))
@@ -2968,9 +3158,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,iif(o==0 .and. n==0,0,1))
@@ -2978,9 +3170,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,iif(o==0 .or. n==0,0,1))
@@ -2988,9 +3182,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,iif((o==0.and.n!=0).or.(o!=0.and.n==0),0,1))
@@ -3003,9 +3199,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                AADD(pila,XGETBIT(n,o,1))
@@ -3014,9 +3212,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                AADD(pila,XSETBIT(n,o+1))
@@ -3024,9 +3224,11 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
                o:=SDP(pila)
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                if valtype(o)!="N"
+                  o:=strtran(o,chr(0),"")
                   o:=val(o)
                end
                AADD(pila,XCLEARBIT(n,o+1))
@@ -3034,6 +3236,7 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
             elseif m=="NOT"   // negacion binaria
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,XNUMNOT(n))
@@ -3041,18 +3244,21 @@ LOCAL VARTABLE:=ARRAY(10),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tm
             elseif m=="BIN"   // convierte a binario
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,DECTOBIN(n)+chr(0))
             elseif m=="HEX"   // convierte a hexadecimal
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,DECTOHEXA(n)+chr(0))
             elseif m=="OCT"   // convierte a OCTAL
                n:=SDP(pila)
                if valtype(n)!="N"
+                  n:=strtran(n,chr(0),"")
                   n:=val(n)
                end
                AADD(pila,DECTOOCTAL(n)+chr(0))
@@ -3595,11 +3801,11 @@ FUNCTION HexaToDec( cString )
 function es_funcion(arg)
 //local _pos:=0,_ret:=.F.,DICC,i,long
 local DICC
-DICC:={"LN","LOG","SQRT","ABS","INT","CEIL","FLOOR","SGN","ROUND","SIN","COS","TAN","UP","LO","MSK","MON","SAT",;
+DICC:={"LN","LOG","SQRT","ABS","INT","CEIL","FLOOR","SGN","ROUND","SIN","COS","TAN","UP","LOW","MSK","MON","SAT",;
        "EXP","INV","RP","CAT","LEN","SUB","AT","AF","RAT","PTRP","PTRM","CP","TR","TK","VAL","CH","LIN","PC","PL","PR","IF",;
        "TRE","INS","DC","RPC","ONE","ASC","TRI","LTRI","RTRI","I","INC","DEC","IFLE","IFGE","LETK","MATCH","LET","DEFT",;
        "NT","POOL","LOOP","MOV","VAR","NOP","COPY","AND","OR","XOR","NOT","BIT","ON","OFF","BIN","HEX","OCT","~",;
-       "JNZ","ELSE","ENDIF","CLEAR","RANGE","FILE","STR","UTF8","ANSI","GLOSS",;
+       "JNZ","ELSE","ENDIF","CLEAR","RANGE","FILE","STR","UTF8","ANSI","GLOSS","RND",;
        "FNA","FNB","FNC","FND","FNE","FNF",;
        "FNH","FNI","FNJ","FNK","FNL","FNM","FNN"}
 
@@ -3753,6 +3959,26 @@ RETURN RX
 #include <ctype.h>
 #include <math.h>
 #include <inttypes.h>
+
+
+// tmppo:=BUSCACOMPLETA(tmpPos,STRING,len(BUSCA))
+
+HB_FUNC( BUSCACOMPLETA )
+{
+   unsigned int pKey  = hb_parni( 1 );
+   PHB_ITEM pSTRING = hb_param( 2, HB_IT_STRING );
+   unsigned int pLen = hb_parni( 3 );  //len busca
+   
+   const char * t = hb_itemGetCPtr( pSTRING );
+
+  // printf("\n%c  %c  %c  %c",*(t+pKey-1),*(t+pKey-1),*(t+pKey+pLen),*(t+pKey+pLen));
+   if ( isalpha(*(t+pKey-2)) || isdigit(*(t+pKey-2)) || 
+        isalpha(*(t+pKey+pLen-1)) || isdigit(*(t+pKey+pLen-1)) ) 
+      hb_retni( 0 );
+   else
+      hb_retni( pKey );
+   hb_itemClear( pSTRING );
+}
 
 void do_fun_xgetbit(){
    unsigned x = hb_parni(1);

@@ -19,6 +19,13 @@ Modo de uso:
    -H n            procesa las 'n' primeras líneas del archivo. Similar a HEAD de Linux.
    -T n            procesa las 'n' últimas líneas del archivo. Similar a TAIL de Linux.
    
+   -ss "string"    busca un string en cada línea procesada: si lo encuentra, la línea se procesa; sino, la
+                   línea se omite. El string puede ser un substring.
+                   La búsqueda es case sensitive.
+   -se "string"    idem a '-ss', pero el string debe ser exacto, no un substring.
+                   La búsqueda es case sensitive.
+   -si             a continuación de '-ss' y '-se', realiza la búsqueda case insensitive.
+   
    -B v
    -B 'v0 v1..'    añade valores al BUFFER, que puede ser usado por LET y LIN.                             
                    Usar el BUFFER para guardar valores es como usar variables globales. Uselas.
@@ -57,6 +64,7 @@ Modo de uso:
    -b              fuerza procesamiento sobre archivo binario. Un archivo binario, para Tolin, es aquel que
                    contiene carcateres ASCII menores a 32 y distintos a 9, 10 y 13. Si tiene un archivo de datos
                    que no debería tener estos caracteres, use '-b' para forzar su proceso.
+
    -d n            define una precisión decimal para todos los cálculos de Tolin. Por default, es 2. Se acepta
                    un valor entre 0 y 15, aunque la máquina de la actual arquitectura solo garantiza hasta 12 o
                    13 decimales correctos, con cuea.
@@ -65,6 +73,9 @@ Modo de uso:
                      tolin -f foo -d 4 '10/2345'   ==> 0.0043
                      tolin -f foo -d 7 '10/2345'   ==> 0.0042644
                      tolin -f foo -d 13 '10/2345'  ==> 0.0042643923241
+   -ts "sep"       define un separador global de tokens. Será usado por las funciones de token de Tolin.
+                   Su valor será alterado por DEFT().
+   -seed n         define una semilla para el generador de números aleatorios de Tolin.
                      
  [-] 'script'      script de comandos que procesarán el archivo.
                    Use el guión '-' antes de 'script' si este viene a continuación del parámetro '-F'.
@@ -437,6 +448,10 @@ Modo de uso:
    ROUND(n,dec)      Redondeo.
 
    ROUND{dec}        Idem, pero en la línea procesada.
+   
+   RND(n)            Devuelve un número aleatorio entre 0 y 1. "n" es un
+                     factor multiplicador. Si no quiere alterar el número
+                     devuelto, use rnd(1).
 
    SGN(n)            -1 si n<0; 1 si n>0; 0 si n=0.
 
@@ -499,11 +514,7 @@ Modo de uso:
                      string alfanumérico y no-numérico (no contiene dígitos),
                      VAL producirá un error.
 
-      (&V)           Idem.
-
    STR(V)            Convierte "V" a tipo string.
-   
-      ($V)           Idem.
 
    CP(V,N)           Repite "V", "N" veces. Ejemplo:
                      cp("*",10)  ==> "**********"
