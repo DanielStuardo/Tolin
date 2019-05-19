@@ -82,6 +82,21 @@ else
 end
 /********/
 
+   PATH_XU:=GETENV("PATH_XU")
+   if alltrim(PATH_XU)==""
+      outstd(_CR,hb_UTF8tostr("Atención: debe declarar la variable de entorno PATH_XU"))
+      outstd(_CR,hb_UTF8tostr("          si quiere ejecutar desde cualquier parte del"))
+      outstd(_CR,hb_UTF8tostr("          sistema."))
+      outstd(_CR,hb_UTF8tostr("          Si está en Linux u OSX, hágalo así:"),_CR)
+      outstd(_CR,hb_UTF8tostr("                export PATH_XU=ruta-de-XU"),_CR)
+      outstd(_CR,hb_UTF8tostr("          Si está en Win8=Dows, hágalo así:"),_CR)
+      outstd(_CR,hb_UTF8tostr("                set PATH_XU=ruta-de-XU"),_CR)
+      outstd(_CR,hb_UTF8tostr("     donde:"),_CR)
+      outstd(_CR,hb_UTF8tostr("        ruta-de-XU = la ruta donde está guardada XU|ED4XU|TOLIN."),_CR)
+      release all
+      quit
+   end
+
 /* CONFIGURA EJECUCION */
 //if numParam>1
 swMacro:=.F.
@@ -337,7 +352,7 @@ if swManual
    setcursor(0)
    TLINEA:=MAXROW()
    SLINEA:=MAXCOL()
-   cVAR:=hb_utf8tostr(MEMOREAD("tolin.help"))
+   cVAR:=hb_utf8tostr(MEMOREAD(PATH_XU+"/help/tolin.help"))
    MSGTOTAL:="AYUDA DE MACROS - TOLIN  | ^C=Av Pag. ^R=Re Pag. ^N=Search ^K=Next ^J=Before"
    public nRow:=1
    public nColumn:=0
