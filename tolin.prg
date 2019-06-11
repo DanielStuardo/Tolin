@@ -45,12 +45,12 @@ function main()
 public _CR:=HB_OSNewline()
 public STRING
 public BUFFER:={}
-public SWNOTNUL:=.F.
 public SWKEEPVACIO:=.F.
 public SWBUFFER:=.F.
 public SWRESET:=.F.
 public SWRADIANES:=.F.
 public SWNUEVALINEA:=.F.
+public SWSENSITIVE:=.T.
 public DEFTOKEN:=" "   // token por defecto.
 public BUFFERLINEA:=128  // por defecto
 public NUMPI:=3.14159265358979323846
@@ -61,7 +61,7 @@ public nSavePos,fp,nEol,TC,TOTALCAR,BUFFERLINEA,nITER
 public SWBIG:=.F.
 
 // array de punteros a funciones
-public _funExec:=array(113)
+public _funExec:=array(115)
 
 _funExec[1]:=0
 _funExec[2]:=0
@@ -105,7 +105,7 @@ _funExec[34]:=@funcopy()
 _funExec[35]:=0
 _funExec[36]:=@fungloss()
 
-_funExec[37]:=@funrp()
+_funExec[37]:=0  //@funrp()
 _funExec[38]:=@funtri()
 _funExec[39]:=@funltri()
 _funExec[40]:=@funrtri()
@@ -168,7 +168,7 @@ _funExec[89]:=@funcos()
 _funExec[90]:=@funtan()
 _funExec[91]:=@funinv()
 //       "+","-","*","/","\","^","%","|","&",;   // O   93-101
-_funExec[92]:=0   // libre
+_funExec[92]:=0   // libre NL
 _funExec[93]:=@funplus()
 _funExec[94]:=@funminus()
 _funExec[95]:=@funmulti()
@@ -192,6 +192,8 @@ _funExec[110]:=@fungreat()
 _funExec[111]:=0   // next
 _funExec[112]:=0   // back
 _funExec[113]:=0   // TPC
+_funExec[114]:=0   // HT
+_funExec[115]:=0   // VT
 
 /*_funExec[102]:=@funle()
 _funExec[103]:=@funge()
@@ -223,12 +225,15 @@ if numParam>0
    END   
 else
    ayudaLinea()
+   quit
 end
 /********/
 
-PATH_XU:=GETENV("PATH_XU")
+public PATH_XU:=GETENV("PATH_XU")  // para el help. Si no encuentra, usa el dir actual
+
 if alltrim(PATH_XU)==""
-   fwrite(1,_CR,hb_UTF8tostr("Atención: debe declarar la variable de entorno PATH_XU"))
+   PATH_XU:=_fileSeparator+CURDIR()+"/help/"
+  /* fwrite(1,_CR,hb_UTF8tostr("Atención: debe declarar la variable de entorno PATH_XU"))
    fwrite(1,_CR,hb_UTF8tostr("          si quiere ejecutar desde cualquier parte del"))
    fwrite(1,_CR,hb_UTF8tostr("          sistema."))
    fwrite(1,_CR,hb_UTF8tostr("          Si está en Linux u OSX, hágalo así:"),_CR)
@@ -238,7 +243,9 @@ if alltrim(PATH_XU)==""
    fwrite(1,_CR,hb_UTF8tostr("     donde:"),_CR)
    fwrite(1,_CR,hb_UTF8tostr("        ruta-de-XU = la ruta donde está guardada XU|ED4XU|TOLIN."),_CR)
    release all
-   quit
+   quit*/
+else
+   PATH_XU:=PATH_XU+"/"
 end
 
 /* CONFIGURA EJECUCION */
@@ -258,7 +265,6 @@ swComando:=.F.
 swBuscaLinea:=.F.
 swBuscaExacta:=.F.
 swNoincluye:=.F.
-SWSENSITIVE:=.T.
 
 nLenVar:=1
 cBUSCASTR:=""
@@ -310,6 +316,24 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
                     "Tolin aborta."+_CR)
             quit
          end
+      
+      elseif STRING=="-dim"   // dimensiona el BUFFER
+         if i==len(_arr_par)
+            fwrite(1,_CR+"Parametro '-B' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         buff:=val(_arr_par[++i])
+         if buff>0
+            BUFFER:=ARRAY(buff)
+            afill(BUFFER,"")
+            nHEADVAR:=len(BUFFER)+1
+         else
+            fwrite(1,_CR+hb_utf8tostr("Parametro '-dim': tamaño debe ser mayor o igual a 1.")+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         
       elseif STRING=="-B"    // valor para el BUFFER
          if i==len(_arr_par)
             fwrite(1,_CR+"Parametro '-B' incompleto."+_CR+;
@@ -548,8 +572,8 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          swBuscaExacta:=.T.
          swBuscaLinea:=.F.
       
-      elseif STRING=="-si"     // busqueda case insensitive
-         SWSENSITIVE:=.F.
+      elseif STRING=="-si"     // busqueda case insensitive solo en GREP
+         ////SWSENSITIVE:=.F.
          PATRONGREP += " -i"
       
       elseif STRING=="-s"   // mete un string cagón.
@@ -683,12 +707,11 @@ else
 end
    
 /* PREPARA SCRIPT */
-SWNOTNUL:=.F.
 SWKEEPVACIO:=.F.
 SWBUFFER:=.F.
 SWRESET:=.F.
 SWSINGLE:=.F.
-if _file!="#"
+if len(alltrim(_file))>1
    Q:=_CTRLL_OBTIENELISTA(_file)
 
    if len(Q)==0
@@ -743,9 +766,11 @@ IF swFoo  //swComando .or. swFoo
       fwrite(1,STRING+_CR)
    else
       RX:=_EVALUA_EXPR(@R,STRING,1,@BUFFER,inputFile,1)
+
       escribeResultados(RX,valtype(RX))
+      
    end
-   exit  // sale del ciclo principal
+   //exit  // sale del ciclo principal
  
 else  // SWBIG:  lee cada linea desde el archivo:
    /* LECTURA DEL ARCHIVO */
@@ -909,11 +934,16 @@ if !SWRESET
          quit
       end
    elseif nHEADVAR>0 .and. SWBUFFER  // imprimo las variables
+     // ? "PASA ",len(BUFFER),",",nHEADVAR,",",SWBUFFER
       for i:=1 to len(BUFFER)
-         fwrite(1,BUFFER[i])
-         fwrite(1," ")
+         if valtype(BUFFER[i])=="C"
+            fwrite(1,BUFFER[i])
+         else
+            fwrite(1,hb_ntos(BUFFER[i]))
+         end
+         fwrite(1,_CR)
       end
-      fwrite(1,_CR)
+     // fwrite(1,_CR)
    end
 end
 
@@ -926,21 +956,14 @@ function escribeResultados(RX,cType)
 
 if cType=="C"
    RX:=strtran(RX,chr(0),"")
-   if len(RX)>0   
-      if RX!="0"
+   if len(RX)>0  
          fwrite(1,hb_strtoutf8(RX)+_CR)
          return .t.
-      else
+   else
          if SWKEEPVACIO
             fwrite(1,_CR)
          end
          return .T.
-      end
-   else
-      if SWKEEPVACIO
-         fwrite(1,_CR)
-      end
-      return .T.
    end
 elseif cType=="N"
    if RX==0
@@ -963,11 +986,11 @@ end
 
 
 procedure ayudaLinea()
-   fwrite(1,("         ,-----.      MMMMM      l")+_CR)
-   fwrite(1,("   /\j__/\  (  \`--.    M   OOO  ll   º  N.  N")+_CR)
-   fwrite(1,("   \`@_@'/  _)  >--.`.  M  O   O ll   I  N N N")+_CR)
-   fwrite(1,("  _{.:Y:_}_{{_,'    ) ) m  O   O ll   Ii N  'n")+_CR)
-   fwrite(1,(" {_}`-^{_} ```     (_/  M   OOO   lll Ii n   N  Versión Alfa.")+_CR)
+   fwrite(1,("         ,-----.      ______      _ ")+_CR)
+   fwrite(1,("   /\j__/\  (  \`--.    ||   ___  ||       |\   ||")+_CR)
+   fwrite(1,("   \`@_@'/  _)  >--.`.  ||  /   \ ||    /  ||\  ||")+_CR)
+   fwrite(1,("  _{.:Y:_}_{{_,'    ) ) ||  |   | ||    |  || \ ||")+_CR)
+   fwrite(1,(" {_}`-^{_} ```     (_/  ||  \___/ \|___ |  ||  \||  Versión Alfa.")+_CR)
    fwrite(1,_CR+"Modo de uso:"+_CR+;
    " tolin [-cdBFM][-man][-ts 'sep'][-seed][-ss|sw|si|nss|nsw 'patron'][-rad] [-fs|fw|nfs|nfw PATRON-file]"+_CR+;
    "       [-buf n] -f [path]file-input | foo"+_CR+; 
@@ -976,7 +999,8 @@ procedure ayudaLinea()
    fwrite(1,("  Consulte 'tolin -man' por opciones, funciones macros y ejemplos.")+_CR+_CR)
    fwrite(1,("  AUTOR.")+_CR)
    fwrite(1,("           Mr. Dalien, mayo de 2019. daniel.stuardo@gmail.com")+_CR)
-   fwrite(1,("           Bugs, consultas, al mail.")+_CR+_CR)
+   fwrite(1,("           Harbour 3.0 (GPL 2.0 compatible), GCC (GNU).")+_CR)
+   fwrite(1,("           Tolin Licencia GPL 2.0. Bugs, consultas, al mail.")+_CR+_CR)
 return
 
 procedure muestraAyuda()
@@ -984,7 +1008,14 @@ local TLINEA,SLINEA,cVAR,MSGTOTAL,cBUSCA,nPos,LISTAFOUND,oldBUSCA,tfound,nInc
    setcursor(0)
    TLINEA:=MAXROW()
    SLINEA:=MAXCOL()
-   cVAR:=hb_utf8tostr(MEMOREAD(PATH_XU+"/help/tolin.help"))
+   if !file(PATH_XU+"tolin.help")
+      fwrite(1,_CR+"No encuentro el archivo 'tolin.help'."+_CR+;
+               "Si no ha instalado XU, asegurese de tener 'tolin.help' en el directorio 'help'"+_CR+;
+               "dentro del directorio donde ha copiado Tolin, y declare la variable de entorno"+_CR+;
+               "de la siguiente manera: "+_CR+_CR+"   export PATH_XU=<ruta-de-tolin>"+_CR+_CR)
+      quit
+   end
+   cVAR:=hb_utf8tostr(MEMOREAD(PATH_XU+"tolin.help"))
    MSGTOTAL:="AYUDA DE MACROS - TOLIN  | ^C=Av Pag. ^R=Re Pag. ^N=Search ^K=Next ^J=Before"
    nPos:={}
    LISTAFOUND:={}
@@ -1196,25 +1227,21 @@ DX:=cTMP
 cTMP:=""
 
 /* algunos reemplazos necesarios */
-if "null" $ DX   // iteración no cancela con líneas nulas
-   SWNOTNUL:=.T.
-   DX:=strtran(DX,"null","")
-end
-if "keep" $ DX    // mantiene el resultado en el buffer, eliminando los datos originales.
-   SWRECBUFFER:=.F.
-   DX:=strtran(DX,"keep","")
-end
-if "void" $ DX
+if "VOID" $ DX
    SWKEEPVACIO:=.T.
-   DX:=strtran(DX,"void","")
+   DX:=strtran(DX,"VOID","")
 end
-if "buff" $ DX
+if "BUFF" $ DX
    SWBUFFER:=.T.
-   DX:=strtran(DX,"buff","")
+   DX:=strtran(DX,"BUFF","")
 end
-if "reset" $ DX
+if "RESET" $ DX
    SWRESET:=.T.
-   DX:=strtran(DX,"reset","")
+   DX:=strtran(DX,"RESET","")
+end
+if "NOSEN" $ DX
+   SWSENSITIVE:=.F.
+   DX:=strtran(DX,"NOSEN","")
 end
 if "_alpha_" $ DX
    DX:=strtran(DX,"_alpha_",hb_utf8tostr(chr(34)+"abcdefghijklmnñopqrstuvwxyz"+chr(34)))
@@ -1240,7 +1267,7 @@ DX:=strtran(DX,"tre{","TRE(#,")
 //DX:=strtran(DX,"{","CH(")  // chr
 //DX:=strtran(DX,"&{","ASC(")  // asc
 DX:=strtran(DX,"{*","CP(#,")
-DX:=strtran(DX,"rp{","RP(#,")
+///DX:=strtran(DX,"rp{","RP(#,")   // ya no. reemplaza la linea de aquí en adelante.
 DX:=strtran(DX,"{+","PTRP(#,")  // avanza puntero del string
 DX:=strtran(DX,"{-","PTRM(#,")  // retorcede puntero extremo de string
 DX:=strtran(DX,"mon{","MON(#,")
@@ -1311,6 +1338,14 @@ while i <= long
          --i
        //  _ERROR("CONV: SIMBOLO NO RECONOCIDO "+c)
       //   RETURN {}
+      end
+   elseif c=="!"
+      c+=substr(DX,++i,1)
+      if c=="!="   // distinto a 
+         AADD(Q,"<>")
+         AADD(R,"<>")
+      else
+         --i
       end
    elseif c=="<"
       c+=substr(DX,++i,1)
@@ -1757,6 +1792,14 @@ while i <= long
          AADD(Q,"NL"); AADD(R,"NL")
          AADD(Q,"("); AADD(R,"(")
          AADD(Q,")"); AADD(R,")")
+      elseif fun=="HT"
+         AADD(Q,"HT"); AADD(R,"HT")
+         AADD(Q,"("); AADD(R,"(")
+         AADD(Q,")"); AADD(R,")")
+      elseif fun=="VT"
+         AADD(Q,"VT"); AADD(R,"VT")
+         AADD(Q,"("); AADD(R,"(")
+         AADD(Q,")"); AADD(R,")")
       elseif fun=="L"
          AADD(Q,"L"); AADD(R,"L")
          AADD(Q,"("); AADD(R,"(")
@@ -1859,7 +1902,7 @@ cFUN:={"FNA","FNA","FNA","FNA","FNA","FNA",;
        "FNM","FNM","FNM","FNM","FNM","FNM","FNM",;
        "FNN","FNN","FNN","FNN","FNN","FNN","FNN",;
        "FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO",;
-       "FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP"}
+       "FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP"}
 
 nFUN:={"FNA","FNB","FNC","FND","FNE","FNF","FNG","FNH","FNI","FNJ","FNK","FNL","FNM","FNN","FNO","FNP"}  // "FNA-FNP"
 
@@ -1878,7 +1921,7 @@ DICC:={"NT","I","VAR","MOV","~","L",;   // A
        "LN","LOG","SQRT","ABS","INT","CEIL","EXP",;  // M
        "FLOOR","SGN","SIN","COS","TAN","INV","NL",;       // N- inv=91; NEWLINE se evalua aparte.
        "+","-","*","/","\","^","%","|","&",">>","<<","!",;   // O   93-104 (ex-101)
-       "<=",">=","<>","=","<",">","NEXT","BACK","TPC"}  // P 105-111  //102-107 NEXT se evalua aparte
+       "<=",">=","<>","=","<",">","NEXT","BACK","TPC","HT","VT"}  // P 105-111  //102-107 NEXT se evalua aparte
        
 /*   */
 
@@ -1939,7 +1982,7 @@ aadd(pila2,"(")
 
               
                   elseif l=="*" 
-                    if m =="^" .or. m=="*" .or. m=="/" .or. m=="%" .or. m=="\"
+                    if isany(m,"^","*","/","%","\") //m =="^" .or. m=="*" .or. m=="/" .or. m=="%" .or. m=="\"
                        aadd(p,m)   //mete m en p
                        aadd(p2,m2)
                     else
@@ -1957,8 +2000,8 @@ aadd(pila2,"(")
                        sw:=.T.
                     end
 
-                  elseif l=="/" .or. l=="\" .or. l=="%"
-                    if m=="*".or.m=="^".or.m=="/" .or. m=="%" .or. m=="\"
+                  elseif isany(l,"/","%","\") //l=="/" .or. l=="\" .or. l=="%"
+                    if isany(m,"^","*","/","%","\") //m=="*".or.m=="^".or.m=="/" .or. m=="%" .or. m=="\"
                        aadd(p,m)     //mete l en p
                        aadd(pila,l) //mete m en pila
                        aadd(p2,m2)
@@ -1979,7 +2022,8 @@ aadd(pila2,"(")
                        sw:=.T.
                     end
                 
-                  elseif l=="+" .or. l=="-" .or. l==">>" .or. l=="<<" .or. l=="&".or.l=="|".or. l=="!".or. es_Lsimbolo(l)
+                  elseif isany(l,"+","-",">>","<<","&","|","!").or. es_Lsimbolo(l) 
+                  //l=="+" .or. l=="-" .or. l==">>" .or. l=="<<" .or. l=="&".or.l=="|".or. l=="!".or. es_Lsimbolo(l)
                      aadd(p,m)       //mete m en p
                      aadd(pila,l)    //mete l en pila
                      aadd(p2,m2)
@@ -2061,7 +2105,7 @@ aadd(pila2,"(")
       elseif m $ "+*-/^%\&|!".or.m=="<<".or.m==">>"  .or. es_Lsimbolo(m)
          o:=SDP(pila)
          n:=SDP(pila)
-         if o==NIL .or. n==NIL // .or. o!="N" .or. n!="N" .and. (n!="X" .and. o!="X")
+         if esnulo(n,o) //o==NIL .or. n==NIL // .or. o!="N" .or. n!="N" .and. (n!="X" .and. o!="X")
             _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA/TIPO DE OPERANDO OP: ( "+m+" )")
             RETURN .F.
          else
@@ -2114,7 +2158,7 @@ aadd(pila2,"(")
             end
             aadd(pila,"C")
             
-         elseif m=="TR" .or. m=="TPC"
+         elseif isany(m,"TR","TPC")  //m=="TR" .or. m=="TPC"
             h:=SDP(pila)
             n:=SDP(pila)
             o:=SDP(pila)
@@ -2195,8 +2239,8 @@ aadd(pila2,"(")
             end
             aadd(pila,"N")
          
-         elseif m=="SUB".or. m=="INS" .or. m=="RPC".or. m=="IF".or. m=="IFLE".or.;
-                m=="IFGE" .or.m=="TKLET"
+         elseif isany(m,"SUB","INS","RPC","IF","IFLE","IFGE","TKLET")
+             //m=="SUB".or. m=="INS" .or. m=="RPC".or. m=="IF".or. m=="IFLE".or.m=="IFGE" .or.m=="TKLET"
             h:=SDP(pila)
             n:=SDP(pila)
             o:=SDP(pila)
@@ -2224,8 +2268,8 @@ aadd(pila2,"(")
             else
                aadd(pila,"N")
             end
-         elseif m=="CAT" .or. m=="CP".or.m=="RP".or.m=="PTRP".or.m=="PTRM" .or. m=="ONE";
-                .or. m=="PL".or.m=="PC".or.m=="PR".or.m=="MSK".or.m=="SAT" .or.m=="DC"
+         elseif isany(m,"CAT","CP","PTRP","PTRM","ONE","PL","PC","PR","MSK","SAT","DC")
+            //  m=="CAT" .or. m=="CP".or.m=="PTRP".or.m=="PTRM" .or. m=="ONE".or. m=="PL".or.m=="PC".or.m=="PR".or.m=="MSK".or.m=="SAT" .or.m=="DC"
             o:=SDP(pila)
             n:=SDP(pila)
             
@@ -2235,8 +2279,8 @@ aadd(pila2,"(")
             else
                aadd(pila,"C")
             end
-         elseif m=="MATCH" .or. m=="AND" .or. m=="OR".or.m=="XOR".or.m=="RAT".or.;
-                m=="BIT".or.m=="ON".or.m=="OFF"
+         elseif isany(m,"MATCH","AND","OR","XOR","RAT","BIT","ON","OFF")
+              //m=="MATCH" .or. m=="AND" .or. m=="OR".or.m=="XOR".or.m=="RAT".or.m=="BIT".or.m=="ON".or.m=="OFF"
             o:=SDP(pila)
             n:=SDP(pila)
             
@@ -2246,7 +2290,8 @@ aadd(pila2,"(")
             else
                aadd(pila,"N")
             end
-         elseif m=="UP".or.m=="LOW".or.m=="TRI".or.m=="LTRI".or.m=="RTRI".or.m=="BIN".or.m=="HEX".or.m=="UTF8".or.m=="ANSI"
+         elseif isany(m,"UP","LOW","TRI","LTRI","RTRI","BIN","HEX","UTF8","ANSI")
+            //m=="UP".or.m=="LOW".or.m=="TRI".or.m=="LTRI".or.m=="RTRI".or.m=="BIN".or.m=="HEX".or.m=="UTF8".or.m=="ANSI"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
@@ -2254,7 +2299,8 @@ aadd(pila2,"(")
             end
             aadd(pila,"C")
 
-         elseif m=="LET" .or. m=="MOV"
+         elseif isany(m,"LET","MOV") 
+            //m=="LET" .or. m=="MOV"
             h:=SDP(pila)
             n:=SDP(pila)
             if esnulo(n,h) //h==NIL .or. n==NIL
@@ -2262,24 +2308,28 @@ aadd(pila2,"(")
                RETURN .F.
             end
 
-         elseif m=="DEFT" .or. m=="LOOP"
+         elseif isany(m,"DEFT","LOOP","RP")
+           //m=="DEFT" .or. m=="LOOP".or.m=="RP"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: ESPERO UN ARGUMENTO VALIDO PARA ("+m+")")
                RETURN .F.
             end
          
-         elseif m=="POOL" .or. m=="CLEAR" .or. m=="JNZ" .or. m=="ELSE" .or. m=="ENDIF".or. m=="NEXT".or.m=="BACK"
+         elseif isany(m,"POOL","CLEAR","JNZ","ELSE","ENDIF","NEXT","BACK")
+            //m=="POOL" .or. m=="CLEAR" .or. m=="JNZ" .or. m=="ELSE" .or. m=="ENDIF".or. m=="NEXT".or.m=="BACK"
             ;
             
-         elseif m=="CH" .or. m=="STR" .or. m=="GLOSS"
+         elseif isany(m,"CH","STR","GLOSS")
+            //m=="CH" .or. m=="STR" .or. m=="GLOSS"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: ESPERO UN ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C") // solo para que pase el analisis
-         elseif m=="LEN".or. m=="ASC" .or. m=="RND".or.m=="DEC" .or. m=="VAR" .or. m=="NOT"
+         elseif isany(m,"LEN","ASC","RND","DEC","VAR","NOT")
+            //m=="LEN".or. m=="ASC" .or. m=="RND".or.m=="DEC" .or. m=="VAR" .or. m=="NOT"
             n:=SDP(pila)
             if n==NIL
                _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
@@ -2294,7 +2344,8 @@ aadd(pila2,"(")
                RETURN .F.
             end
             aadd(pila,"N")
-         elseif m=="NOP"  .or. m=="FILE".or.m=="NL"
+         elseif isany(m,"NOP","FILE","NL","HT","VT")
+            //m=="NOP"  .or. m=="FILE".or.m=="NL".or. m=="HT".or.m=="VT"
             aadd(pila,"C")
 
          elseif m=="COPY"
@@ -2305,7 +2356,8 @@ aadd(pila2,"(")
             end
            
             
-         elseif m=="I" .or. m=="NT".or.m=="L"  //.or.m=="LINEEND"
+         elseif isany(m,"I","NT","L")
+            //m=="I" .or. m=="NT".or.m=="L"  //.or.m=="LINEEND"
             aadd(pila,"N")
          else
             m:=SDP(pila)
@@ -2361,7 +2413,7 @@ aadd(pila2,"(")
 
 
 /*   for i:=1 to len(p2)
-      ?? p2[i],", "
+      ? "CODE=",i," : ",p2[i]
    end
    inkey(0) */
   /* if len(pila)>1
@@ -2466,7 +2518,7 @@ LOCAL CX
 
 //       "+","-","*","/","\","^","%","|","&",">>","<<","!";   // O   93-104
 
-            if !(_funExec[m]:EXEC(@pila,@o,@n,@vo,@vn))
+            if !(_funExec[m]:EXEC(@pila,@o,@n,@vo,@vn,par))
                return .F.
             end
             EXIT
@@ -2528,8 +2580,15 @@ LOCAL CX
                AADD(pila, POSCHAR(o,n,h)+chr(0))
                loop
                exit
-            end  
-            
+            case 114   // HT
+               AADD(pila,chr(9)+chr(0))
+               exit
+            case 115   // VT
+               AADD(pila,chr(11)+chr(0))
+               exit
+        
+            otherwise
+        
             n:=SDP(pila)
             o:=SDP(pila)
          /*   if esnulo(n,o)   //n==NIL .or. o==NIL
@@ -2577,6 +2636,8 @@ LOCAL CX
 //       "<=",">=","<>","=","<",">"}  // P  102-107
             if !(_funExec[m]:EXEC(@pila,@o,@n,@vtip,@ITERACION))
                return .F.
+            end
+            
             end
             EXIT
 
@@ -2646,6 +2707,19 @@ LOCAL CX
          //elseif m=="FNG"
          CASE 7
             m:=p[++i]
+            if m==37  // reemplaza el parametro por un nuevo valor
+               o:=SDP(pila)
+               if valtype(o)=="N"
+                  o:=hb_ntos(o)
+               else
+                  o:=strtran(o,chr(0),"")
+               end
+               
+               ///AADD(pila,o)
+               par:=o
+               NUMTOK:=numtoken(par,DEFTOKEN)
+               loop
+            end
             if !(_funExec[m]:EXEC(@pila))
                return .F.
             end
@@ -2732,7 +2806,7 @@ LOCAL CX
          CASE 14
             m:=p[++i]
             if m==92
-               AADD(pila,_CR)
+               AADD(pila,_CR+chr(0))
                EXIT
             end
             n:=SDP(pila)
@@ -3133,7 +3207,7 @@ function funmulti(pila,o,n,vo,vn)  // 95
                end
 return .T.
 function fundiv(pila,o,n,vo,vn)  // 96
-               if vn=="N" 
+               if vn=="N"
                   if vo=="N"
                      if n!=0
                         AADD(pila,o/n)
@@ -3142,9 +3216,11 @@ function fundiv(pila,o,n,vo,vn)  // 96
                      end
                   else
                      o:=strtran(o,chr(0),"")
+                     //? "O=",o," N=",n
                      AADD(pila,substr(o,n,len(o))+chr(0))
                   end
                else
+                 /// ? "O=",o," N=",n
                   if vo=="C"
                      n:=strtran(n,chr(0),"")
                      o:=strtran(o,chr(0),"")
@@ -3247,7 +3323,7 @@ function funoxor(pila,o,n,vo,vn)  // 104  xor
             end
 return .T.
 
-function funidiv(pila,o,n,vo,vn)  // 97
+function funidiv(pila,o,n,vo,vn,par)  // 97
                if vn=="N" 
                   if vo=="N"
                      if n!=0
@@ -3263,7 +3339,7 @@ function funidiv(pila,o,n,vo,vn)  // 97
                   AADD(pila,"TYPE-\-ERROR")
                end
 return .T.
-function funpot(pila,o,n,vo,vn)  // 98
+function funpot(pila,o,n,vo,vn,par)  // 98
 
                if vn=="N"
                   if vo=="N"
@@ -3307,8 +3383,13 @@ return .T.
 function funmodulo(pila,o,n,vo,vn)  // 99
 local vip
 vip:=vn+vo
+////? "VIP=",vip," O=",o," N=",n
                if vip=="NN"
                   AADD(pila,o%n)
+               elseif vip=="NC"
+                  o:=strtran(o,chr(0),"")
+                //  ? "POS=",POSCARACTER(o,n)
+                  AADD(pila, POSCARACTER(o,n)+chr(0))
                elseif vip=="CC"
                   n:=strtran(n,chr(0),"")
                   o:=strtran(o,chr(0),"")
@@ -3411,26 +3492,30 @@ LOCAL n,pilaif:={}
      else
         n:=strtran(n,chr(0),"")
      end
-     
+     //  ? "ENTRA ?"
      // ? "JNZ=",n; inkey(0)
      IF LEN(n)>0 .and. n!="0"  // busco "ELSE"
         ++i  //pos: codigo de funcion
         while i<=LENP
            //if valtype(p[i])=="N"  //"C"
+         //  ? "p(",i,")=",p[i]
            if p[i]==2 // "FNB"
               ++i
               if p[i]==8  //"ELSE" 
                  if len(pilaif)==0
                     exit
                  end
+                 ++i
               elseif p[i]==9  //"ENDIF"
                  if len(pilaif)>0
                     asize(pilaif,len(pilaif)-1)
+                    ++i
                  else
                     exit
                  end
               elseif p[i]==7 //JNZ  // pone en pila
                  aadd(pilaif,1)
+                 ++i
               end
            else
               i += 2  // avanzo a sig. codigo de funcion
@@ -3453,22 +3538,27 @@ return .T.
 function funelse(pila,p,i,LENP)
 LOCAL pilaif:={}
   ++i
+ // ? "ENTRA ELSE"
   while i<=LENP
      //if valtype(p[i])=="C"
+     //? "p(",i,")=",p[i]
       if p[i]==2 //"FNB"
           ++i
           if p[i]==8   ///"ELSE"
            if len(pilaif)==0
               exit
            end
+           ++i
           elseif p[i]==9   //"ENDIF"
            if len(pilaif)>0
               asize(pilaif,len(pilaif)-1)
+              ++i
            else
               exit
            end
           elseif p[i]==7   //"JNZ"  // pone en pila
            aadd(pilaif,1)
+           ++i
           end
       else
           i += 2  // avanzo a sig, codigo de funcion
@@ -3484,6 +3574,7 @@ return .T.
 
 function funendif(pila)
   // nada.
+ //   ? "ENTRA ENDIF"
 return .T.
 
 function funpool(pila,JMP,LENJMP,LENP,i)
@@ -4292,20 +4383,20 @@ LOCAL n
   AADD(pila,lower(n)+chr(0))
 return .T.
 
-function funrp(pila)
+/*function funrp(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)  // debe sacarlo, porque sino, no reemplaza
- /* if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN RP")
-     RETURN .F.
-  end */
+//  if esnulo(n,o)   //n==NIL.or.o==NIL
+//     _ERROR("EVALUADOR: VALOR NULO EN RP")
+//     RETURN .F.
+//  end
   if valtype(o)=="N"
      o:=hb_ntos(o)
   end
   o:=strtran(o,chr(0),"")
   AADD(pila,o)
-return .T.
+return .T.*/
 
 function funtre(pila)
 LOCAL m,n,o,ids,id,j,c1,c2
@@ -5107,6 +5198,7 @@ LOCAL n
      n:=strtran(n,chr(0),"")
      n:=val(n)
   end
+ // ? "::","0x"+DECTOHEXA(n)+"h"
   AADD(pila,DECTOHEXA(n)+chr(0))
 return .T.
 
@@ -5282,7 +5374,7 @@ FUNCTION DecToBin( nNumber )
       nNumber := Int( ( nNumber - nTemp ) / 2 )
    ENDDO
 
-   RETURN cNewString
+   RETURN "0x"+cNewString+"b"
 
 FUNCTION DecToOctal( nNumber )
 
@@ -5297,7 +5389,7 @@ FUNCTION DecToOctal( nNumber )
    if len(cNewString)==0
       cNewString:="0"
    end
-   RETURN cNewString
+   RETURN "0x"+cNewString+"o"
 
 FUNCTION DecToHexa( nNumber )
 
@@ -5312,7 +5404,7 @@ FUNCTION DecToHexa( nNumber )
    if len(cNewString)==0
       cNewString:="0"
    end
-   RETURN cNewString
+   RETURN "0x"+cNewString+"h"
 
 FUNCTION BinToDec( cString )
 
@@ -5374,7 +5466,7 @@ DICC:={"NT","I","VAR","MOV","~","L",;   // A 1-6
        "NOP","AND","OR","XOR",;    // K  67-70
        "NOT","BIT","ON","OFF","BIN","HEX","DEC","OCT",; // L  71-78
        "LN","LOG","SQRT","ABS","INT","CEIL","EXP","NL",;  // M  79-85
-       "FLOOR","SGN","SIN","COS","TAN","INV","NEXT","BACK","TPC"}   //N  86-91 (inv)
+       "FLOOR","SGN","SIN","COS","TAN","INV","NEXT","BACK","TPC","HT","VT"}   //N  86-91 (inv)
                              
 //long:=len(DICC)
 //_pos:=Ascan(DICC, arg)
@@ -5529,6 +5621,19 @@ HB_FUNC( XFUNNUM2STRING )
   free(nDev);
 }
 */
+
+HB_FUNC( POSCARACTER )
+{
+   PHB_ITEM pTEXTO = hb_param(1, HB_IT_STRING );
+   HB_SIZE nPos = hb_parni ( 2 );
+   char * cRet = (char *)calloc(2,1);
+   const char * szText = hb_itemGetCPtr( pTEXTO );
+   cRet[0] = szText[nPos-1];
+   cRet[1] = '\0';
+   hb_retc( cRet );
+   free(cRet);
+}
+
 HB_SIZE hb_striAt( const char * szSub, HB_SIZE nSubLen, const char * szText, HB_SIZE nLen )
 {
 
