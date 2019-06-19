@@ -59,9 +59,13 @@ public nColumn:=0
 // archivos BIG y NEXT
 public nSavePos,fp,nEol,TC,TOTALCAR,BUFFERLINEA,nITER
 public SWBIG:=.F.
+public SWSTOP:=.F.
+public SWEOF:=.F.
+public NUMTOK:=0
+public SIZEVAR:=20
 
 // array de punteros a funciones
-public _funExec:=array(115)
+public _funExec:=array(118)
 
 _funExec[1]:=0
 _funExec[2]:=0
@@ -189,11 +193,14 @@ _funExec[107]:=@funneq()
 _funExec[108]:=@funequal()
 _funExec[109]:=@funless()
 _funExec[110]:=@fungreat()
-_funExec[111]:=0   // next
-_funExec[112]:=0   // back
-_funExec[113]:=0   // TPC
-_funExec[114]:=0   // HT
-_funExec[115]:=0   // VT
+_funExec[111]:=@funnext()   // next
+_funExec[112]:=@funback()   // back
+_funExec[113]:=@funtpc()   // TPC
+_funExec[114]:=@funht()   // HT
+_funExec[115]:=@funvt()   // VT
+_funExec[116]:=@funeof()  // EOF
+_funExec[117]:=@funenv()  // getENV 
+_funExec[118]:=@funsay()  // say
 
 /*_funExec[102]:=@funle()
 _funExec[103]:=@funge()
@@ -296,7 +303,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 
       elseif STRING=="-d"  // define precision numerica
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-d' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-d' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -304,22 +311,34 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          SET DECIMAL TO nPrecision
          nPrecision:=0
       
+      elseif STRING=="-mem"   // establece numero de variables de memoria
+         if i==len(_arr_par)
+            fwrite(1,_CR+"El Meke dice: Parametro '-mem' incompleto."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
+         SIZEVAR:=val(_arr_par[++i])
+         if SIZEVAR<0
+            fwrite(1,_CR+"El Meke dice: Parametro '-mem': minimo requerido es cero."+_CR+;
+                    "Tolin aborta."+_CR)
+            quit
+         end
       elseif STRING=="-buf"   // establece un baffer maximo de lectura
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-buf' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-buf' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
          BUFFERLINEA:=val(_arr_par[++i])
          if BUFFERLINEA<100
-            fwrite(1,_CR+"Parametro '-buf': minimo requerido son 100 bytes (default=128)."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-buf': minimo requerido son 100 bytes (default=128)."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
       
       elseif STRING=="-dim"   // dimensiona el BUFFER
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-B' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-B' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -329,14 +348,14 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
             afill(BUFFER,"")
             nHEADVAR:=len(BUFFER)+1
          else
-            fwrite(1,_CR+hb_utf8tostr("Parametro '-dim': tamaño debe ser mayor o igual a 1.")+_CR+;
+            fwrite(1,_CR+hb_utf8tostr("El Meke dice: Parametro '-dim': tamaño debe ser mayor o igual a 1.")+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
          
       elseif STRING=="-B"    // valor para el BUFFER
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-B' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-B' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -360,7 +379,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 
       elseif STRING=="-M"  // archivo input multiples
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-M' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-M' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -382,7 +401,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 
       elseif STRING=="-c"   // procesa un comando del sistema operativo.
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-c' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-c' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -398,7 +417,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          elseif swBuscaLinea .or. swBuscaExacta
             PATRONGREP += " -E"
          else
-            fwrite(1,_CR+"Parametro '-E' debe saber antes si busca un patron."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-E' debe saber antes si busca un patron."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -414,7 +433,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          elseif swBuscaLinea .or. swBuscaExacta
             PATRONGREP += " -P"
          else
-            fwrite(1,_CR+"Parametro '-P' debe saber antes si busca un patron."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-P' debe saber antes si busca un patron."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -428,7 +447,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
     //     SWRAW:=.T.
       elseif STRING=="-nfs"    // devuelve las lineas donde no se encuentre contenido el string
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-nfs' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-nfs' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -438,12 +457,12 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
                FILEGREP:=" -f "+ctmp
                swFileGrep:=.T.
             else
-               fwrite(1,_CR+"Parametro '-nfs': el archivo no es valido."+_CR+;
+               fwrite(1,_CR+"El Meke dice: Parametro '-nfs': el archivo no es valido."+_CR+;
                        "Tolin aborta."+_CR)
                quit
             end
          else
-            fwrite(1,_CR+"Parametro '-nfs': no encuentro el archivo especificado."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-nfs': no encuentro el archivo especificado."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -455,7 +474,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          
       elseif STRING=="-nss"    // devuelve las lineas donde no se encuentre contenido el string
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-nss' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-nss' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -466,7 +485,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
       
       elseif STRING=="-nfw"   // busca un archivo de patrones completos
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-nfw' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-nfw' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -476,12 +495,12 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
                FILEGREP:=" -f "+ctmp
                swFileGrep:=.T.
             else
-               fwrite(1,_CR+"Parametro '-nfw': el archivo no es valido."+_CR+;
+               fwrite(1,_CR+"El Meke dice: Parametro '-nfw': el archivo no es valido."+_CR+;
                        "Tolin aborta."+_CR)
                quit            
             end
          else
-            fwrite(1,_CR+"Parametro '-nfw': no encuentro el archivo especificado."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-nfw': no encuentro el archivo especificado."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -492,7 +511,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
                      
       elseif STRING=="-nsw"     // busca un string y devuelve sus líneas para proceso
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-nsw' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-nsw' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -503,7 +522,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 
       elseif STRING=="-fs"     // busca un string y devuelve sus líneas para proceso
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-fs' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-fs' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -513,12 +532,12 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
                FILEGREP:=" -f "+ctmp
                swFileGrep:=.T.
             else
-               fwrite(1,_CR+"Parametro '-fs': el archivo no es valido."+_CR+;
+               fwrite(1,_CR+"El Meke dice: Parametro '-fs': el archivo no es valido."+_CR+;
                        "Tolin aborta."+_CR)
                quit            
             end
          else
-            fwrite(1,_CR+"Parametro '-fs': no encuentro el archivo especificado."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-fs': no encuentro el archivo especificado."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -529,7 +548,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          
       elseif STRING=="-ss"     // busca un string y devuelve sus líneas para proceso
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-ss' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-ss' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -539,7 +558,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
       
       elseif STRING=="-fw"     // busca un string y devuelve sus líneas para proceso
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-fw' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-fw' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -549,12 +568,12 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
                FILEGREP:=" -f "+ctmp
                swFileGrep:=.T.
             else
-               fwrite(1,_CR+"Parametro '-fw': el archivo no es valido."+_CR+;
+               fwrite(1,_CR+"El Meke dice: Parametro '-fw': el archivo no es valido."+_CR+;
                        "Tolin aborta."+_CR)
                quit            
             end
          else
-            fwrite(1,_CR+"Parametro '-fw': no encuentro el archivo especificado."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-fw': no encuentro el archivo especificado."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -564,7 +583,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 
       elseif STRING=="-sw"     // busca un string y devuelve sus líneas para proceso
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-sw' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-sw' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -578,7 +597,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
       
       elseif STRING=="-s"   // mete un string cagón.
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-s' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-s' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -588,7 +607,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          
       elseif STRING=="-seed"   // añade semilla random
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-seed' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-seed' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -596,7 +615,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
       
       elseif STRING=="-ts"   // separador de token
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-ts' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-ts' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -604,7 +623,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
 
       elseif STRING=="-f"  // archivo input
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '-f' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '-f' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -629,7 +648,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          end
       elseif STRING=="-" // archivo/script de macros
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '"+STRING+"' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '"+STRING+"' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -638,7 +657,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
          swManual:=.T.    
       elseif STRING=="-t" .or. STRING=="-" // archivo/script de macros
          if i==len(_arr_par)
-            fwrite(1,_CR+"Parametro '"+STRING+"' incompleto."+_CR+;
+            fwrite(1,_CR+"El Meke dice: Parametro '"+STRING+"' incompleto."+_CR+;
                     "Tolin aborta."+_CR)
             quit
          end
@@ -647,7 +666,7 @@ OPERATING_SYSTEM:=upper(alltrim(substr(OSHost,1,at(" ",OSHost))))
             swMacro:=.T.
          end
       elseif substr(STRING,1,1)=="-"
-         fwrite(1,_CR+"Parametro '"+STRING+"' no reconocido."+_CR+;
+         fwrite(1,_CR+"El Meke dice: Parametro '"+STRING+"' no reconocido."+_CR+;
                     "Tolin aborta."+_CR)
          quit
       else                 // asume script en linea.
@@ -672,20 +691,20 @@ end
 IF !swComando
    if swInput
       if !file(inputFile) .and. !swFoo
-         fwrite(1,_CR+"No existe el archivo de entrada '"+inputFile+"'"+_CR+_CR+"Tolin aborta"+_CR)
+         fwrite(1,_CR+"El Meke dice: No existe el archivo de entrada '"+inputFile+"'"+_CR+_CR+"Tolin aborta"+_CR)
          quit
       end
    else
       if swMInput
          for i:=1 to len(inputMultiple)
             if !file(inputMultiple[i])
-               fwrite(1,_CR+"No existe el archivo de entrada '"+inputMultiple[i]+"'"+_CR+_CR+"Tolin aborta"+_CR)
+               fwrite(1,_CR+"El Meke dice: No existe el archivo de entrada '"+inputMultiple[i]+"'"+_CR+_CR+"Tolin aborta"+_CR)
                quit
             end
          end
       else
          if len(cSTRINGFOO)==0
-            fwrite(1,_CR+"No fue indicado un archivo de entrada"+_CR+"Use '-f input-file'."+_CR+_CR+"Tolin aborta"+_CR)
+            fwrite(1,_CR+"El Meke dice: No fue indicado un archivo de entrada"+_CR+"Use '-f input-file'."+_CR+_CR+"Tolin aborta"+_CR)
             quit
          end
       end
@@ -694,14 +713,14 @@ END
 
 if swMacro
    if !file(_file)
-      fwrite(1,_CR+"No existe el archivo de macros '"+_file+"'"+_CR+_CR+"Tolin aborta"+_CR)
+      fwrite(1,_CR+"El Meke dice: No existe el archivo de macros '"+_file+"'"+_CR+_CR+"Tolin aborta"+_CR)
       quit
    else  // lo carga
       _file:=memoread(_file)
    end
 else
    if len(alltrim(_file))==0
-      fwrite(1,_CR+"No fue indicado un script o archivo de macros"+_CR+"Use '-t macro-file' para usar un archivo de macros."+_CR+_CR+"Tolin aborta"+_CR)
+      fwrite(1,_CR+"El Meke dice: No fue indicado un script o archivo de macros"+_CR+"Use '-t macro-file' para usar un archivo de macros."+_CR+_CR+"Tolin aborta"+_CR)
       quit
    end
 end
@@ -753,7 +772,7 @@ ELSE  // comando del sistema
          cBUFF:=""
          fclose(xfp)
       else
-         fwrite(1,_CR+"*** Error interno: comando no pudo ser satisfecho ***"+_CR)
+         fwrite(1,_CR+"El Meke dice: *** Error interno: comando no pudo ser satisfecho ***"+_CR)
          quit
       end
       SWBIG:=.T.
@@ -826,11 +845,11 @@ else  // SWBIG:  lee cada linea desde el archivo:
    // inicia proceso de tolin
    fp:=fopen(inputFile,0)
    if ferror()!=0
-      fwrite(1,_CR+"El archivo '"+inputFile+"' no puede abrirse."+_CR+_CR+"Tolin aborta."+_CR)
+      fwrite(1,_CR+"El Meke dice: El archivo '"+inputFile+"' no puede abrirse."+_CR+_CR+"Tolin aborta."+_CR)
       quit
    end
    TOTALCAR:=fseek(fp,0,2)
-   TC:=0
+  // TC:=0
    fseek(fp,0,0)
    
    CX:=SPACE(256)
@@ -864,29 +883,41 @@ else  // SWBIG:  lee cada linea desde el archivo:
       //BX:=left(BX,at(_CR,BX)-1)
       BX:=FREADSPECIAL(fp,BUFFERLINEA)
       nEol:=len(BX)+1  // debe contar los caracteres especiales para el FSEEK
-      TC:=TC+nEol
-      FSEEK( fp, nSavePos + nEol, 0 )  // nEol + 1 
-       
-      if TC>TOTALCAR
+      TC:=nSavePos + nEol   //TC+nEol
+      FSEEK( fp, TC, 0 )  // nEol + 1 
+      
+      if TC > TOTALCAR
          fclose(fp)
          exit
+      end 
+      if HB_FEOF(fp)
+         SWEOF:=.T.
+         
       end
-      
+      //?"BX=",BX," SWEOF?=",SWEOF
       if SWSINGLE
          //fwrite(1,hb_strtoutf8(RX)+_CR)
          fwrite(1,BX+_CR)
       else
          //PROCESA BX
+        // ? "ENTRA"
          RX:=_EVALUA_EXPR(@R,BX,@nITER,@BUFFER,inputFile,0)
          if !escribeResultados(RX,valtype(RX))
             fclose(fp)
             exit
          end
+         if SWSTOP
+            fclose(fp)
+            exit
+         end
       end
-  /*    if TC>TOTALCAR  // puesta aquí, lee basura al final del archivo.
+      //if TC > TOTALCAR
+     /* if SWEOF
+         ? "FIN DE LA LECTURA"
          fclose(fp)
          exit
-      end */
+      end
+      ?"PASO IGUAL" */
       ++nITER
       DEFTOKEN:=TMPTOKEN   // reseteo token global
    end
@@ -904,7 +935,7 @@ if SWRESET
    if len(BUFFER)>=nHEADVAR
       tARCHIVO:=substr(inputFile,rat("/",inputFile)+1,len(inputFile))+".buffer"
       if !SAVEFILE(BUFFER,tARCHIVO,LEN(BUFFER),nHEADVAR)
-         _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
+         _ERROR("EL MEKETREFE DICE: NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
          quit
       end
    end
@@ -917,6 +948,8 @@ if SWRESET
 end
 
 /*********/
+SWSTOP:=.F.    // resetea fin de proceso.
+SWEOF:=.F.
 DEFTOKEN:=TMPTOKEN   // reseteo token global
 
 END  // for
@@ -930,7 +963,7 @@ if !SWRESET
          tARCHIVO:="foo.buffer"
       end
       if !SAVEFILE(BUFFER,tARCHIVO,LEN(BUFFER),nHEADVAR)
-         _ERROR("NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
+         _ERROR("EL MEKETREFE DICE: NO FUE POSIBLE GUARDAR EL CONTENIDO DEL BUFFER")
          quit
       end
    elseif nHEADVAR>0 .and. SWBUFFER  // imprimo las variables
@@ -1226,6 +1259,11 @@ end
 DX:=cTMP
 cTMP:=""
 
+if "next" $ DX .and. !("eof" $ DX)
+   _ERROR("EL CHOLITO DICE: DEBE USAR 'EOF' SI QUIERE USAR 'NEXT'")
+   RETURN {}   
+end
+
 /* algunos reemplazos necesarios */
 if "VOID" $ DX
    SWKEEPVACIO:=.T.
@@ -1260,7 +1298,7 @@ DX:=strtran(DX,"(-","(0-")  // ajusto negativos
 //DX:=strtran(DX,"(++","INC(")
 DX:=strtran(DX,"ins{","INS(#,")
 DX:=strtran(DX,"range{","RANGE(#,") 
-DX:=strtran(DX,"#{","LIN(")  // linea
+///DX:=strtran(DX,"#{","LIN(")  // linea
 DX:=strtran(DX,"trea{","TREA(#,")
 DX:=strtran(DX,"treb{","TREB(#,")
 DX:=strtran(DX,"tre{","TRE(#,")
@@ -1271,7 +1309,7 @@ DX:=strtran(DX,"{*","CP(#,")
 DX:=strtran(DX,"{+","PTRP(#,")  // avanza puntero del string
 DX:=strtran(DX,"{-","PTRM(#,")  // retorcede puntero extremo de string
 DX:=strtran(DX,"mon{","MON(#,")
-DX:=strtran(DX,"${","TK(#,")
+//DX:=strtran(DX,"${","TK(#,")
 DX:=strtran(DX,"round{","ROUND(#,")
 DX:=strtran(DX,"sub{","SUB(#,")
 DX:=strtran(DX,"tra{","TRA(#,")
@@ -1292,6 +1330,7 @@ DX:=strtran(DX,"dc{","DC(#,")
 DX:=strtran(DX,"one{","ONE(#,")
 DX:=strtran(DX,"tpc{","TPC(#,")
 DX:=strtran(DX,"tklet{","TKLET(#,")
+
 ///? DX; inkey(0)
 /**/
 i:=1
@@ -1304,7 +1343,7 @@ while i <= long
    end
    if SWFUN
       if c!="("
-         _ERROR("CONV: DEBE IR UN PARENTESIS AQUI: "+substr(DX,1,i)+"<<")
+         _ERROR("EL CHOLITO DICE: DEBE IR UN PARENTESIS AQUI: "+substr(DX,1,i)+"<<")
          RETURN {}
       end
    end
@@ -1320,7 +1359,7 @@ while i <= long
       AADD(R,c)
       --ctap
       if ctap<0
-         _ERROR("CONV: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+         _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
          RETURN {}
       end
    elseif c==">"
@@ -1336,7 +1375,7 @@ while i <= long
          AADD(Q,c)
          AADD(R,c)
          --i
-       //  _ERROR("CONV: SIMBOLO NO RECONOCIDO "+c)
+       //  _ERROR("EL CHOLITO DICE: SIMBOLO NO RECONOCIDO "+c)
       //   RETURN {}
       end
    elseif c=="!"
@@ -1360,7 +1399,7 @@ while i <= long
          AADD(Q,c)
          AADD(R,c)
          --i 
-       //  _ERROR("CONV: SIMBOLO NO RECONOCIDO "+c)
+       //  _ERROR("EL CHOLITO DICE: SIMBOLO NO RECONOCIDO "+c)
        //  RETURN {}
       end
    elseif c==chr(126)   // not
@@ -1385,63 +1424,113 @@ while i <= long
    elseif c=="#"    // puede ser numero de línea de buffer si es acompañado de un numero #1, #3...
       tmpi:=i-1  // por si es una asignación
       ++i
-      num:=""
-      while i<=long
-         c:=substr(DX,i,1)
-         if c==" "
-            ++i
-            loop
-         end
-         if isdigit(c)
-            num+=c
-            ++i
-         else
-            --i
-            exit
-         end
-      end
-      if len(num)==0  // es un parámetro de linea procesada.
-         AADD(Q,"N")
-         AADD(R,"#")
-
-      elseif c=="("   // es una asignación
-         // busco hasta donde asigna:
-         ctmpi:=i
-         strfun:=""
-         i+=2  // para saltarme primer "("
-         ctpar:=1
+      c:=substr(DX,i,1)
+      if c=="{"   // es un indice compuesto
+         num:=""
+         ++i
          while i<=long
             c:=substr(DX,i,1)
-            strfun+=c
-            if c=="("
-               ++ctpar
-            elseif c==")"
-               --ctpar
-               if ctpar==0
-                  exit
-               end
-               if ctpar<0
-                  _ERROR("CONV: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
-                  RETURN {}
-               end
+            if c=="}"  // cierra composicion
+               ++i
+               exit
             end
+            num+=c
             ++i
          end
-         DX:=substr(DX,1,tmpi)+"LET("+num+","+strfun+substr(DX,++i,len(DX))
-         long:=LEN(DX)
-         i:=tmpi  // restauro indice para que lea "TKLET"
-       //  ? "DX?=", DX; inkey(0)
-      else
-         if ISTNUMBER(num)!=1
-            _ERROR("CONV: NUMERO DE LINEA NO VALIDO: "+substr(DX,1,i)+"<<")
-            RETURN {}
-         else
-            AADD(Q,"LIN"); AADD(R,"LIN")
-            AADD(Q,"("); AADD(R,"(")
-            AADD(Q,"N");  AADD(R,val(num))
-            AADD(Q,")"); AADD(R,")")
+         c:=substr(DX,i,1)
+         if c=="("  // es una asignacion
+            // busco hasta donde asigna:
+            ctmpi:=i
+            strfun:=c
+            ++i
+            //i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               strfun+=c
+               if c=="("
+                  ++ctpar
+               elseif c==")"
+                  --ctpar
+                  if ctpar==0
+                     exit
+                  end
+                  if ctpar<0
+                     _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                     RETURN {}
+                  end
+               end
+               ++i
+            end
+            DX:=substr(DX,1,tmpi)+"LET("+num+","+strfun+")"+substr(DX,++i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+            ///? "DX=",DX
+         else   // es una linea
+            DX:=substr(DX,1,tmpi)+"LIN("+num+")"+substr(DX,i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+           // ? "DX=",DX
          end
-      end
+      else
+         num:=""  
+         while i<=long
+            c:=substr(DX,i,1)
+            if c==" "
+               ++i
+               loop
+            end
+            if isdigit(c)
+               num+=c
+               ++i
+            else
+               --i
+               exit
+            end
+         end
+         if len(num)==0  // es un parámetro de linea procesada.
+            AADD(Q,"N")
+            AADD(R,"#")
+
+         elseif c=="("   // es una asignación
+            // busco hasta donde asigna:
+            ctmpi:=i
+            strfun:=""
+            i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               strfun+=c
+               if c=="("
+                  ++ctpar
+               elseif c==")"
+                  --ctpar
+                  if ctpar==0
+                     exit
+                  end
+                  if ctpar<0
+                     _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                     RETURN {}
+                  end
+               end
+               ++i
+            end
+            DX:=substr(DX,1,tmpi)+"LET("+num+","+strfun+substr(DX,++i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+          //  ? "DX?=", DX; inkey(0)
+         else
+            if ISTNUMBER(num)!=1
+               _ERROR("EL CHOLITO DICE: NUMERO DE LINEA NO VALIDO: "+substr(DX,1,i)+"<<")
+               RETURN {}
+            else
+               AADD(Q,"LIN"); AADD(R,"LIN")
+               AADD(Q,"("); AADD(R,"(")
+               AADD(Q,"N");  AADD(R,val(num))
+               AADD(Q,")"); AADD(R,")")
+            end
+         end
+      end  // indice compuesto
 
 /*   elseif c=="#"   // puede ser numero de línea de buffer si es acompañado de un numero #1, #3...
       ++i
@@ -1462,7 +1551,7 @@ while i <= long
          AADD(R,"#")
       else
          if ISTNUMBER(num)!=1
-            _ERROR("CONV: NUMERO DE LINEA NO VALIDO: "+substr(DX,1,i)+"<<")
+            _ERROR("EL CHOLITO DICE: NUMERO DE LINEA NO VALIDO: "+substr(DX,1,i)+"<<")
             RETURN {}
          end
          AADD(Q,"LIN"); AADD(R,"LIN")
@@ -1484,7 +1573,7 @@ while i <= long
          end
       end
       if ISTNUMBER(num)!=1 .or. len(num)==0
-         _ERROR("CONV: NUMERO DE TOKEN NO VALIDO: "+substr(DX,1,i)+"<<")
+         _ERROR("EL CHOLITO DICE: NUMERO DE TOKEN NO VALIDO: "+substr(DX,1,i)+"<<")
          RETURN {}
       end
       AADD(Q,"TK"); AADD(R,"TK")
@@ -1495,115 +1584,216 @@ while i <= long
    elseif c=="$"    // puede ser un token del tipo AWK $1, $2,...$n o un cambio de token $n(valor)
       tmpi:=i-1  // por si es una asignación
       ++i
-      num:=""
-      while i<=long
-         c:=substr(DX,i,1)
-         if c==" "
-            ++i
-            loop
-         end
-         if isdigit(c)
-            num+=c
-            ++i
-         else
-            --i
-            exit
-         end
-      end
-      if ISTNUMBER(num)!=1 .or. len(num)==0
-         _ERROR("CONV: NUMERO DE TOKEN NO VALIDO: "+substr(DX,1,i)+"<<")
-         RETURN {}
-      end
-      if c=="("   // es una asignación
-         // busco hasta donde asigna:
-         ctmpi:=i
-         strfun:=""
-         i+=2  // para saltarme primer "("
-         ctpar:=1
+      c:=substr(DX,i,1)
+      if c=="{"   // es un indice compuesto
+         num:=""
+         ++i
          while i<=long
             c:=substr(DX,i,1)
-            strfun+=c
-            if c=="("
-               ++ctpar
-            elseif c==")"
-               --ctpar
-               if ctpar==0
-                  exit
-               end
-               if ctpar<0
-                  _ERROR("CONV: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
-                  RETURN {}
-               end
+            if c=="}"  // cierra composicion
+               ++i
+               exit
             end
+            num+=c
             ++i
          end
-         DX:=substr(DX,1,tmpi)+"TKLET(#,"+num+","+strfun+substr(DX,++i,len(DX))
-         long:=LEN(DX)
-         i:=tmpi  // restauro indice para que lea "TKLET"
-       //  ? "DX?=", DX; inkey(0)
+         c:=substr(DX,i,1)
+         if c=="("  // es una asignacion
+            // busco hasta donde asigna:
+            ctmpi:=i
+            strfun:=c
+            ++i
+            //i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               strfun+=c
+               if c=="("
+                  ++ctpar
+               elseif c==")"
+                  --ctpar
+                  if ctpar==0
+                     exit
+                  end
+                  if ctpar<0
+                     _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                     RETURN {}
+                  end
+               end
+               ++i
+            end
+            DX:=substr(DX,1,tmpi)+"TKLET(#,"+num+","+strfun+")"+substr(DX,++i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+//            ? "DX=",DX
+         else   // es una linea
+            DX:=substr(DX,1,tmpi)+"TK(#,"+num+")"+substr(DX,i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+//            ? "DX=",DX
+         end
       else
-         AADD(Q,"TK"); AADD(R,"TK")
-         AADD(Q,"("); AADD(R,"(")
-         AADD(Q,"N");  AADD(R,"#")
-         AADD(Q,"N");  AADD(R,val(num))
-         AADD(Q,")"); AADD(R,")")
+         num:=""  
+         while i<=long
+            c:=substr(DX,i,1)
+            if c==" "
+               ++i
+               loop
+            end
+            if isdigit(c)
+               num+=c
+               ++i
+            else
+               --i
+               exit
+            end
+         end
+         if ISTNUMBER(num)!=1 .or. len(num)==0
+            _ERROR("EL CHOLITO DICE: NUMERO DE TOKEN NO VALIDO: "+substr(DX,1,i)+"<<")
+            RETURN {}
+         end
+         if c=="("   // es una asignación
+            // busco hasta donde asigna:
+            ctmpi:=i
+            strfun:=""
+            i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               strfun+=c
+               if c=="("
+                  ++ctpar
+               elseif c==")"
+                  --ctpar
+                  if ctpar==0
+                     exit
+                  end
+                  if ctpar<0
+                     _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                     RETURN {}
+                  end
+               end
+               ++i
+            end
+            DX:=substr(DX,1,tmpi)+"TKLET(#,"+num+","+strfun+substr(DX,++i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+          //  ? "DX?=", DX; inkey(0)
+         else
+            AADD(Q,"TK"); AADD(R,"TK")
+            AADD(Q,"("); AADD(R,"(")
+            AADD(Q,"N");  AADD(R,"#")
+            AADD(Q,"N");  AADD(R,val(num))
+            AADD(Q,")"); AADD(R,")")
+         end
       end
    elseif c=="@"    // variable de registro.
       tmpi:=i-1  // por si es una asignación
       ++i
-      num:=""
-      while i<=long
-         c:=substr(DX,i,1)
-         if c==" "
-            ++i
-            loop
-         end
-         if isdigit(c)
-            num+=c
-            ++i
-         else
-            --i
-            exit
-         end
-      end
-      if ISTNUMBER(num)!=1 .or. len(num)==0
-         _ERROR("CONV: NUMERO DE REGISTRO NO VALIDO: "+substr(DX,1,i)+"<<")
-         RETURN {}
-      end
-      if c=="("   // es una asignación
-         // busco hasta donde asigna:
-         ctmpi:=i
-         strfun:=""
-         i+=2  // para saltarme primer "("
-         ctpar:=1
+      c:=substr(DX,i,1)
+      if c=="{"   // es un indice compuesto
+         num:=""
+         ++i
          while i<=long
             c:=substr(DX,i,1)
-            strfun+=c
-            if c=="("
-               ++ctpar
-            elseif c==")"
-               --ctpar
-               if ctpar==0
-                  exit
-               end
-               if ctpar<0
-                  _ERROR("CONV: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
-                  RETURN {}
-               end
+            if c=="}"  // cierra composicion
+               ++i
+               exit
             end
+            num+=c
             ++i
          end
-         DX:=substr(DX,1,tmpi)+"MOV("+num+","+strfun+substr(DX,++i,len(DX))
-         long:=LEN(DX)
-         i:=tmpi  // restauro indice para que lea "MOV"
-       //  ? "DX?=", DX; inkey(0)
+         c:=substr(DX,i,1)
+         if c=="("  // es una asignacion
+            // busco hasta donde asigna:
+            ctmpi:=i
+            strfun:=c
+            ++i
+            //i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               strfun+=c
+               if c=="("
+                  ++ctpar
+               elseif c==")"
+                  --ctpar
+                  if ctpar==0
+                     exit
+                  end
+                  if ctpar<0
+                     _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                     RETURN {}
+                  end
+               end
+               ++i
+            end
+            DX:=substr(DX,1,tmpi)+"MOV("+num+","+strfun+")"+substr(DX,++i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+//            ? "DX=",DX
+         else   // es una linea
+            DX:=substr(DX,1,tmpi)+"VAR("+num+")"+substr(DX,i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "TKLET"
+//            ? "DX=",DX
+         end
+
       else
-         AADD(Q,"VAR"); AADD(R,"VAR")
-         AADD(Q,"("); AADD(R,"(")
-         AADD(Q,"N");  AADD(R,val(num))
-         AADD(Q,")"); AADD(R,")")
+         num:=""  
+         while i<=long
+            c:=substr(DX,i,1)
+            if c==" "
+               ++i
+               loop
+            end
+            if isdigit(c)
+               num+=c
+               ++i
+            else
+               --i
+               exit
+            end
+         end
+         if ISTNUMBER(num)!=1 .or. len(num)==0
+            _ERROR("EL CHOLITO DICE: NUMERO DE REGISTRO NO VALIDO: "+substr(DX,1,i)+"<<")
+            RETURN {}
+         end
+         if c=="("   // es una asignación
+            // busco hasta donde asigna:
+            ctmpi:=i
+            strfun:=""
+            i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               strfun+=c
+               if c=="("
+                  ++ctpar
+               elseif c==")"
+                  --ctpar
+                  if ctpar==0
+                     exit
+                  end
+                  if ctpar<0
+                     _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                     RETURN {}
+                  end
+               end
+               ++i
+            end
+            DX:=substr(DX,1,tmpi)+"MOV("+num+","+strfun+substr(DX,++i,len(DX))
+            long:=LEN(DX)
+            i:=tmpi  // restauro indice para que lea "MOV"
+            //  ? "DX?=", DX
+         else
+            AADD(Q,"VAR"); AADD(R,"VAR")
+            AADD(Q,"("); AADD(R,"(")
+            AADD(Q,"N");  AADD(R,val(num))
+            AADD(Q,")"); AADD(R,")")
+         end
       end
-   
+
    elseif c=='"'   // es un string. para rep() y cat()
       AADD(Q,"C")
       //str:='"'
@@ -1629,7 +1819,7 @@ while i <= long
          ++i
       end
       if i>LEN(DX)
-         _ERROR("CONV: CADENA NO HA SIDO CERRADA: "+substr(DX,1,i)+"<<")
+         _ERROR("EL CHOLITO DICE: CADENA NO HA SIDO CERRADA: "+substr(DX,1,i)+"<<")
          RETURN {}
       end
 
@@ -1654,7 +1844,7 @@ while i <= long
            for j:=1 to len(num)
               xt:=substr(num,j,1)
               if xt!="0" .and. xt!="1"
-                 _ERROR("CONV: NUMERO BINARIO MAL FORMADO: "+num)
+                 _ERROR("EL CHOLITO DICE: NUMERO BINARIO MAL FORMADO: "+num)
                  RETURN {}
               end
            end
@@ -1663,7 +1853,7 @@ while i <= long
            for j:=1 to len(num)
               xt:=substr(num,j,1)
               if !(xt $ "01234567")
-                 _ERROR("CONV: NUMERO OCTAL MAL FORMADO: "+num)
+                 _ERROR("EL CHOLITO DICE: NUMERO OCTAL MAL FORMADO: "+num)
                  RETURN {}
               end
            end
@@ -1672,13 +1862,13 @@ while i <= long
            for j:=1 to len(num)
               xt:=substr(num,j,1)
               if !(xt $ "0123456789ABCDEF")
-                 _ERROR("CONV: NUMERO HEXADECIMAL MAL FORMADO: "+num)
+                 _ERROR("EL CHOLITO DICE: NUMERO HEXADECIMAL MAL FORMADO: "+num)
                  RETURN {}
               end
            end
            num:=HEXATODEC(num)
         else   // no es ninguna hueá: error!
-           _ERROR("CONV: BASE NUMERICA NO RECONOCIDA: "+num)
+           _ERROR("EL CHOLITO DICE: BASE NUMERICA NO RECONOCIDA: "+num)
            RETURN {}
         end 
    //     ? "NUM=",num; inkey(0)
@@ -1699,7 +1889,7 @@ while i <= long
               elseif isdigit(c)
                  num+=c
               else
-                 _ERROR("CONV: NO ES UN NUMERO NOTACION-CIENTIFICA VALIDO: "+num)
+                 _ERROR("EL CHOLITO DICE: NO ES UN NUMERO NOTACION-CIENTIFICA VALIDO: "+num)
                  RETURN {}
               end
            else
@@ -1712,7 +1902,7 @@ while i <= long
            AADD(R,E2D(num))
         else
            if ISTNUMBER(num)!=1 .or. !isdigit(substr(num,len(num),1))
-              _ERROR("CONV: NO ES UN NUMERO VALIDO: "+num)
+              _ERROR("EL CHOLITO DICE: NO ES UN NUMERO VALIDO: "+num)
               RETURN {}  // error
            else
               AADD(R,val(num))
@@ -1739,7 +1929,7 @@ while i <= long
             elseif isdigit(c)
                num+=c
             else
-               _ERROR("CONV: NO ES UN NUMERO NOTACION-CIENTIFICA VALIDO: "+num)
+               _ERROR("EL CHOLITO DICE: NO ES UN NUMERO NOTACION-CIENTIFICA VALIDO: "+num)
                RETURN {}
             end
          else
@@ -1755,7 +1945,7 @@ while i <= long
          AADD(R,E2D(num))
       else
          if ISTNUMBER(num)!=1 .or. !isdigit(substr(num,len(num),1))
-            _ERROR("CONV: NO ES UN NUMERO VALIDO: "+num)
+            _ERROR("EL CHOLITO DICE: NO ES UN NUMERO VALIDO: "+num)
             RETURN {}  // error
          else
             num:=val(num)
@@ -1812,8 +2002,8 @@ while i <= long
          AADD(Q,"BACK"); AADD(R,"BACK")
          AADD(Q,"("); AADD(R,"(")
          AADD(Q,")"); AADD(R,")")
-      elseif fun=="POOL"
-         AADD(Q,"POOL"); AADD(R,"POOL")
+      elseif fun=="DO"
+         AADD(Q,"DO"); AADD(R,"DO")
          AADD(Q,"("); AADD(R,"(")
          AADD(Q,")"); AADD(R,")")
 /*         AADD(Q,"FNC"); AADD(R,"FNC")
@@ -1827,16 +2017,16 @@ while i <= long
          AADD(Q,"NT"); AADD(R,"NT")
          AADD(Q,"("); AADD(R,"(")
          AADD(Q,")"); AADD(R,")")
-/*         AADD(Q,"FNA"); AADD(R,"FNA")
+      elseif fun=="EOF"   // total de tokens
+         AADD(Q,"EOF"); AADD(R,"EOF")
          AADD(Q,"("); AADD(R,"(")
-         AADD(Q,")"); AADD(R,")") */
-       ///  ? "ENCONTRO NT"; inkey(0)
+         AADD(Q,")"); AADD(R,")")
       elseif fun=="CLEAR"
          AADD(Q,"CLEAR"); AADD(R,"CLEAR")
          AADD(Q,"("); AADD(R,"(")
          AADD(Q,")"); AADD(R,")")
-      elseif fun=="NOP"
-         AADD(Q,"NOP"); AADD(R,"NOP")
+      elseif fun=="STOP"
+         AADD(Q,"STOP"); AADD(R,"STOP")
          AADD(Q,"("); AADD(R,"(")
          AADD(Q,")"); AADD(R,")")
 /*         AADD(Q,"FNK"); AADD(R,"FNK")
@@ -1877,7 +2067,7 @@ while i <= long
 end
 
 if /*Q[len(Q)]!=")" .and. Q[LEN(Q)]!="N" .or.*/ ctap!=0
-   _ERROR("CONV: PARENTESIS DESBALANCEADOS")
+   _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS")
    RETURN {}
 end
 RETURN {Q,R}
@@ -1902,13 +2092,14 @@ cFUN:={"FNA","FNA","FNA","FNA","FNA","FNA",;
        "FNM","FNM","FNM","FNM","FNM","FNM","FNM",;
        "FNN","FNN","FNN","FNN","FNN","FNN","FNN",;
        "FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO",;
-       "FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP","FNP"}
+       "FNP","FNP","FNP","FNP","FNP","FNP",;
+       "FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ"}
 
-nFUN:={"FNA","FNB","FNC","FND","FNE","FNF","FNG","FNH","FNI","FNJ","FNK","FNL","FNM","FNN","FNO","FNP"}  // "FNA-FNP"
+nFUN:={"FNA","FNB","FNC","FND","FNE","FNF","FNG","FNH","FNI","FNJ","FNK","FNL","FNM","FNN","FNO","FNP","FNQ"}  // "FNA-FNQ"
 
 DICC:={"NT","I","VAR","MOV","~","L",;   // A
        "JNZ","ELSE","ENDIF",;   // B
-       "POOL","LOOP","ROUND","UTF8","ANSI",;           // C
+       "DO","UNTIL","ROUND","UTF8","ANSI",;           // C
        "CAT","MATCH","LEN","SUB","AT","RANGE","ATA",;  // D
        "AF","RAT","PTRP","PTRM","CP","TR","TRA","TRB","AFA",;  // E
        "TK","TKLET","LET","COPY","FILE","GLOSS",;    // F     
@@ -1916,13 +2107,13 @@ DICC:={"NT","I","VAR","MOV","~","L",;   // A
        "TRE","INS","DC","RPC","ONE","RND","TREA","TREB",;       // H
        "VAL","STR","CH","ASC","LIN","PC","PL","PR",;    // I
        "MSK","MON","SAT","DEFT","IF","IFLE","IFGE","CLEAR",; // J
-       "NOP","AND","OR","XOR",;    // K
+       "STOP","AND","OR","XOR",;    // K
        "NOT","BIT","ON","OFF","BIN","HEX","DEC","OCT",; // L
        "LN","LOG","SQRT","ABS","INT","CEIL","EXP",;  // M
        "FLOOR","SGN","SIN","COS","TAN","INV","NL",;       // N- inv=91; NEWLINE se evalua aparte.
        "+","-","*","/","\","^","%","|","&",">>","<<","!",;   // O   93-104 (ex-101)
-       "<=",">=","<>","=","<",">","NEXT","BACK","TPC","HT","VT"}  // P 105-111  //102-107 NEXT se evalua aparte
-       
+       "<=",">=","<>","=","<",">",;  // P 105-110 
+       "NEXT","BACK","TPC","HT","VT","EOF","ENV","SAY"}   // Q  111-118
 /*   */
 
 
@@ -1947,7 +2138,7 @@ aadd(pila2,"(")
                aadd(pila,l)     // es funcion
                aadd(pila2,l2)
             else
-               _ERROR("SINTAXIS(1): SIMBOLO NO RECONOCIDO >>"+l+"<<") //substr(l,2,len(l))+")")
+               _ERROR("LA PERLA DICE: SIMBOLO NO RECONOCIDO >>"+l+"<<") //substr(l,2,len(l))+")")
                RETURN .F.
             end
          else
@@ -2048,7 +2239,7 @@ aadd(pila2,"(")
                   aadd(pila,"(")   //mete cen en pila
                   aadd(pila2,"(")
                end
-            elseif l==")"          // es un parentesis derecho?
+            elseif l==")"        // es un parentesis derecho?
                m:=SDP(pila)        // extrae de pila para m
                m2:=SDP(pila2)
 //               ? "M==",m
@@ -2059,7 +2250,7 @@ aadd(pila2,"(")
                   m2:=SDP(pila2)
                   //?? m
                   if esnulo(m)   //m==nil
-                      _ERROR("SINTAXIS(2): EXPRESION MAL FORMADA")
+                      _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA")
                       RETURN .F.
                   end
                end
@@ -2092,6 +2283,12 @@ aadd(pila2,"(")
          m2:=SDP(pila2)
       end
    end
+   
+/*   for i:=1 to len(p)
+      ? "CODE=",i," : ",p[i]
+   end
+   inkey(0) */
+   
    // revisa sintacticamente todo.
    pila:={}
 
@@ -2106,33 +2303,45 @@ aadd(pila2,"(")
          o:=SDP(pila)
          n:=SDP(pila)
          if esnulo(n,o) //o==NIL .or. n==NIL // .or. o!="N" .or. n!="N" .and. (n!="X" .and. o!="X")
-            _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA/TIPO DE OPERANDO OP: ( "+m+" )")
+            _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA/TIPO DE OPERANDO OP: ( "+m+" )")
             RETURN .F.
-         else
-            aadd(pila,"N")
          end
+       /*  if !isany(n,"N","C") .or. !isany(o,"N","C") 
+            _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. EXPRESION DEBE SER ENCERRADA ENTRE PARENTESIS OP: ( "+m+" )")
+            RETURN .F.
+         end*/
+         aadd(pila,"N")
+
       elseif es_funcion(m)
          if substr(m,1,2)=="FN"  // no tiene que evaluar esto.
             loop
          end
          if m=="ROUND"
-            m:=SDP(pila)
+            o:=SDP(pila)
             n:=SDP(pila)
-            if esnulo(n,m) //m==NIL .or. n==NIL ///.or. n!="N" .or. m!="N" .and. (n!="X" .and. m!="X")
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA/TIPO DE ARGUMENTO (ROUND)")
+            if esnulo(n,o) //m==NIL .or. n==NIL ///.or. n!="N" .or. m!="N" .and. (n!="X" .and. m!="X")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA/TIPO DE ARGUMENTO (ROUND)")
                RETURN .F.
-            else
-               aadd(pila,"N")
             end
+      /*      if !isany(n,"N","C") .or. !isany(o,"N","C") 
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. EXPRESION DEBE SER ENCERRADA ENTRE PARENTESIS OP: ( ROUND )")
+               RETURN .F.
+            end */
+            aadd(pila,"N")
+
          elseif m=="MON"
             h:=SDP(pila)
             n:=SDP(pila)
             o:=SDP(pila)
             m:=SDP(pila)
             if esnulo(n,o,h,m) //h==NIL .or. n==NIL .or. o==NIL .or. m==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO (MON)")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO (MON)")
                RETURN .F.
             end
+          /*  if !isany(n,"N","C") .or. !isany(o,"N","C") .or. !isany(m,"N","C") .or. !isany(h,"N","C")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. EXPRESION DEBE SER ENCERRADA ENTRE PARENTESIS OP: ( MON )")
+               RETURN .F.
+            end */
             aadd(pila,"C")
 
          elseif m=="TRB"
@@ -2141,7 +2350,7 @@ aadd(pila2,"(")
             o:=SDP(pila)
             y:=SDP(pila)  // ocurrencia
             if esnulo(n,o,h,y) //h==NIL .or. n==NIL .or. o==NIL .or. y==NIL 
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2153,7 +2362,7 @@ aadd(pila2,"(")
             y:=SDP(pila)  // ocurrencia
             x:=SDP(pila)  // reemplazos
             if esnulo(n,o,h,x,y) //h==NIL .or. n==NIL .or. o==NIL .or. y==NIL .or. x==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2163,7 +2372,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             o:=SDP(pila)
             if esnulo(n,o,h) //h==NIL .or. n==NIL .or. o==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2174,7 +2383,7 @@ aadd(pila2,"(")
             o:=SDP(pila)
             y:=SDP(pila)  // ocurrencia
             if esnulo(n,o,h,y) //h==NIL .or. n==NIL .or. o==NIL .or. y==NIL 
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2186,7 +2395,7 @@ aadd(pila2,"(")
             y:=SDP(pila)  // ocurrencia
             x:=SDP(pila)  // reemplazos
             if esnulo(n,o,h,x,y) //h==NIL .or. n==NIL .or. o==NIL .or. y==NIL .or. x==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2196,7 +2405,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             o:=SDP(pila)
             if esnulo(n,o,h) //h==NIL .or. n==NIL .or. o==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2206,7 +2415,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             x:=SDP(pila)  // ocurrencia
             if esnulo(n,o,x) //o==NIL .or. n==NIL .or. x==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")  
@@ -2215,7 +2424,7 @@ aadd(pila2,"(")
             o:=SDP(pila)
             n:=SDP(pila)
             if esnulo(n,o) //o==NIL .or. n==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")        
@@ -2225,7 +2434,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             x:=SDP(pila)  // ocurrencia
             if esnulo(n,o,x) //o==NIL .or. n==NIL .or. x==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")
@@ -2234,7 +2443,7 @@ aadd(pila2,"(")
             o:=SDP(pila)
             n:=SDP(pila)
             if esnulo(n,o) //o==NIL .or. n==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")
@@ -2245,7 +2454,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             o:=SDP(pila)
             if esnulo(n,o,h) //h==NIL .or. n==NIL .or. o==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2254,7 +2463,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             o:=SDP(pila)
             if esnulo(n,o,h) //h==NIL .or. n==NIL .or. o==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")
@@ -2263,7 +2472,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             
             if esnulo(n,o) //o==NIL .or. n==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             else
                aadd(pila,"N")
@@ -2274,7 +2483,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             
             if esnulo(n,o) //o==NIL .or. n==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             else
                aadd(pila,"C")
@@ -2285,7 +2494,7 @@ aadd(pila2,"(")
             n:=SDP(pila)
             
             if esnulo(n,o) //o==NIL .or. n==NIL// .or. n!="C" .or. m!="C"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             else
                aadd(pila,"N")
@@ -2294,7 +2503,7 @@ aadd(pila2,"(")
             //m=="UP".or.m=="LOW".or.m=="TRI".or.m=="LTRI".or.m=="RTRI".or.m=="BIN".or.m=="HEX".or.m=="UTF8".or.m=="ANSI"
             n:=SDP(pila)
             if n==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C")
@@ -2304,27 +2513,27 @@ aadd(pila2,"(")
             h:=SDP(pila)
             n:=SDP(pila)
             if esnulo(n,h) //h==NIL .or. n==NIL
-               _ERROR("SINTAXIS: FALTAN ARGUMENTOS EN "+m)
+               _ERROR("LA PERLA DICE: FALTAN ARGUMENTOS EN "+m)
                RETURN .F.
             end
 
-         elseif isany(m,"DEFT","LOOP","RP")
+         elseif isany(m,"DEFT","UNTIL","RP","JNZ")
            //m=="DEFT" .or. m=="LOOP".or.m=="RP"
             n:=SDP(pila)
             if n==NIL
-               _ERROR("SINTAXIS: ESPERO UN ARGUMENTO VALIDO PARA ("+m+")")
+               _ERROR("LA PERLA DICE: ESPERO UN ARGUMENTO VALIDO PARA ("+m+")")
                RETURN .F.
             end
          
-         elseif isany(m,"POOL","CLEAR","JNZ","ELSE","ENDIF","NEXT","BACK")
+         elseif isany(m,"DO","CLEAR","ELSE","ENDIF","NEXT","BACK","STOP")
             //m=="POOL" .or. m=="CLEAR" .or. m=="JNZ" .or. m=="ELSE" .or. m=="ENDIF".or. m=="NEXT".or.m=="BACK"
             ;
             
-         elseif isany(m,"CH","STR","GLOSS")
+         elseif isany(m,"CH","STR","GLOSS","ENV")
             //m=="CH" .or. m=="STR" .or. m=="GLOSS"
             n:=SDP(pila)
             if n==NIL
-               _ERROR("SINTAXIS: ESPERO UN ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: ESPERO UN ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"C") // solo para que pase el analisis
@@ -2332,7 +2541,7 @@ aadd(pila2,"(")
             //m=="LEN".or. m=="ASC" .or. m=="RND".or.m=="DEC" .or. m=="VAR" .or. m=="NOT"
             n:=SDP(pila)
             if n==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")
@@ -2340,36 +2549,36 @@ aadd(pila2,"(")
          elseif m=="VAL"
             n:=SDP(pila)
             if n==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
             aadd(pila,"N")
-         elseif isany(m,"NOP","FILE","NL","HT","VT")
-            //m=="NOP"  .or. m=="FILE".or.m=="NL".or. m=="HT".or.m=="VT"
+         elseif isany(m,"FILE","NL","HT","VT")
+            //m=="FILE".or.m=="NL".or. m=="HT".or.m=="VT"
             aadd(pila,"C")
 
-         elseif m=="COPY"
+         elseif isany(m,"COPY","SAY")
             n:=SDP(pila)
             if n==NIL
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
            
             
-         elseif isany(m,"I","NT","L")
+         elseif isany(m,"I","NT","L","EOF")
             //m=="I" .or. m=="NT".or.m=="L"  //.or.m=="LINEEND"
             aadd(pila,"N")
          else
             m:=SDP(pila)
             if m==NIL //.or. m!="N"
-               _ERROR("SINTAXIS: EXPRESION MAL FORMADA. FALTA ARGUMENTO O TIPO DISTINTO")
+               _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO O TIPO DISTINTO")
                RETURN .F.
             else
                aadd(pila,"N")
             end
          end
       else  // puede ser variable
-         _ERROR("SINTAXIS: SIMBOLO NO RECONOCIDO ("+m+")")
+         _ERROR("LA PERLA DICE: SIMBOLO NO RECONOCIDO ("+m+")")
          RETURN .F.
       end
    end
@@ -2415,18 +2624,18 @@ aadd(pila2,"(")
 /*   for i:=1 to len(p2)
       ? "CODE=",i," : ",p2[i]
    end
-   inkey(0) */
-  /* if len(pila)>1
-      _ERROR("SINTAXIS: EXPRESION MAL FORMADA (QUEDAN "+hb_ntos(len(pila))+" RESULTADOS EN PILA).")
+   inkey(0)*/
+   if len(pila)>1
+      _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA (QUEDAN "+hb_ntos(len(pila))+" RESULTADOS EN PILA).")
       RETURN .F.
-   end */
+   end 
 RETURN p2
 
 
 FUNCTION _EVALUA_EXPR(p,par,ITERACION,tBUFFER,FILENAME,ENDFILE)
-LOCAL res,pila,m,n,o,h,x,y,k,i,j,id:=0,ids:=0,c1,c2,c3,str,nLength,NUMTOK:=0,xvar,ope:=0,vtip
-LOCAL VARTABLE:=ARRAY(20),JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tmpPos,swFound,tmpo,tmpn
-LOCAL CX
+LOCAL res,pila,m,n,o,h,x,y,k,i,j,id:=0,ids:=0,c1,c2,c3,str,nLength,xvar,ope:=0,vtip
+LOCAL VARTABLE,JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tmpPos,swFound,tmpo,tmpn
+LOCAL CX,tmpPar
 //LOCAL tmpAT,tmpATF,swAF,swAT
 
    pila:={}
@@ -2437,6 +2646,7 @@ LOCAL CX
 //   tmpATF:=0   // idem para AF
 //   swAF:=.F.   // si ya hizo una búsqueda en la linea.
 //   swAT:=.F.
+   VARTABLE:=ARRAY(SIZEVAR)
    afill(VARTABLE,"")
    NUMTOK:=numtoken(par,DEFTOKEN)
 //   if pcount()==5
@@ -2476,10 +2686,10 @@ LOCAL CX
             m:=p[++i]
             n:=SDP(pila)
             o:=SDP(pila)
-        /*    if esnulo(n,o)   //n==NIL .or. o==NIL
-               _ERROR("EVALUADOR: EXPRESION MAL FORMADA EN OPERACION ARITMETICO-LOGICA")
+            if esnulo(n,o)   //n==NIL .or. o==NIL
+               _ERROR("LA MONA DICE: VALOR NULO EN OPERACION ARITMETICO-LOGICA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
                RETURN .F.
-            end*/
+            end
             vn:=valtype(n)
             vo:=valtype(o)
             if vn=="C"
@@ -2525,76 +2735,14 @@ LOCAL CX
             
          //elseif m=="FNP"
          CASE 16  // "FNP"
-         //elseif m $ "+*-/^%|&\" .or. es_Lsimbolo(m)
-            m:=p[++i]
-
-            switch m
-            case 111   // NEXT
-               //? "PASA"
-               if SWBIG
-                  nSavePos := FSEEK( fp, 0, 1 )  // rescata posicion anterior
-                  //CX:=FREADSTR(fp,BUFFERLINEA)
-                  //par := SUBSTR( CX, 1, at(hb_osnewline(),CX)-1)  // quito newline aqui
-                  par:=FREADSPECIAL(fp,BUFFERLINEA)
-
-                  nEol:=len(par)+1  // debe contar los caracteres especiales para el FSEEK
-                  TC:=TC+nEol
-//                  if TC>TOTALCAR
-//                     exit
-//                  end
-                  FSEEK( fp, nSavePos + nEol, 0 ) 
-                  ++ITERACION
-                  loop
-               else
-                  _ERROR("EVALUADOR: NEXT SOLO SE PUEDE USAR CON OPCION '-big'")
-                  RETURN .F.                  
-               end
-               exit 
-            case 112   // BACK
-               if SWBIG
-                  FSEEK( fp, nSavePos, 0 )  // posicion anterior.
-                  --ITERACION
-                  loop
-               else
-                  _ERROR("EVALUADOR: BACK SOLO SE PUEDE USAR CON OPCION '-big'")
-                  RETURN .F.                  
-               end
-               exit
-            case 113   // TPC
-               h:=SDP(pila)
-               n:=SDP(pila) 
-               o:=SDP(pila)
-               if valtype(h)!="N"
-                  h:=val(h)
-               end
-               if valtype(n)=="N"
-                  n:=hb_ntos((n))
-               else
-                  n:=strtran(n,chr(0),"")
-               end
-               if valtype(o)=="N"
-                  o:=hb_ntos((o))
-               else
-                  o:=strtran(o,chr(0),"")
-               end
-               AADD(pila, POSCHAR(o,n,h)+chr(0))
-               loop
-               exit
-            case 114   // HT
-               AADD(pila,chr(9)+chr(0))
-               exit
-            case 115   // VT
-               AADD(pila,chr(11)+chr(0))
-               exit
-        
-            otherwise
-        
+         //elseif m $ "+*-/^%|&\" .or. es_Lsimbolo(m)     
+            m:=p[++i]   
             n:=SDP(pila)
             o:=SDP(pila)
-         /*   if esnulo(n,o)   //n==NIL .or. o==NIL
-               _ERROR("EVALUADOR: EXPRESION MAL FORMADA EN OPERACION LOGICA")
+            if esnulo(n,o)   //n==NIL .or. o==NIL
+               _ERROR("LA MONA DICE: VALOR NULO EN OPERACION LOGICA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
                RETURN .F.
-            end*/
+            end
             vn:=valtype(n)
             vo:=valtype(o)
             if vn=="C"
@@ -2613,7 +2761,6 @@ LOCAL CX
                   end
                end
             end
-            
             
             if vo=="C"
                if right(o,1)!=chr(0)  //!(chr(0) $ o)
@@ -2636,8 +2783,6 @@ LOCAL CX
 //       "<=",">=","<>","=","<",">"}  // P  102-107
             if !(_funExec[m]:EXEC(@pila,@o,@n,@vtip,@ITERACION))
                return .F.
-            end
-            
             end
             EXIT
 
@@ -2759,8 +2904,11 @@ LOCAL CX
          //elseif m=="FNK"
          CASE 11
             m:=p[++i]
-            if m==67
-               AADD(pila,"")
+            if m==67   // stop
+               ///AADD(pila,"")
+               hb_keyPut(27)
+               SWSTOP:=.T.
+               loop
             else  
                if !(_funExec[m]:EXEC(@pila))
                   return .F.
@@ -2780,11 +2928,11 @@ LOCAL CX
          CASE 13
             m:=p[++i]
             n:=SDP(pila)
-           /* if esnulo(n)   //n==NIL
+            if esnulo(n)   //n==NIL
                FUN:=IIF(m==79,"LN",iif(m==80,"LOG",iif(m==81,"SQRT",iif(m==82,"ABS",iif(m==83,"INT []",iif(m==84,"CEIL","EXP"))))))
-               _ERROR("EVALUADOR: VALOR NULO EN "+FUN)
+               _ERROR("LA MONA DICE: VALOR NULO EN "+FUN+_CR+"Quizas no encerraste una expresión entre paréntesis")
                RETURN .F.
-            end*/
+            end
             if valtype(n)!="N"
                n:=alltrim(n)
                n:=strtran(n,chr(0),"")
@@ -2793,7 +2941,7 @@ LOCAL CX
                elseif ISNOTATION(n)==1
                   n:=e2d(n)
                else
-                  _ERROR("EVALUADOR: OPERANDO NO ES UN NUMERO "+n)
+                  _ERROR("LA MONA DICE: OPERANDO NO ES UN NUMERO "+n)
                   RETURN .F.
                end
             end
@@ -2810,11 +2958,11 @@ LOCAL CX
                EXIT
             end
             n:=SDP(pila)
-          /*  if esnulo(n)   //n==NIL
+            if esnulo(n)   //n==NIL
                FUN:=IIF(m==86,"FLOOR",iif(m==87,"SGN",iif(m==88,"SIN",iif(m==89,"COS",iif(m==90,"TAN","INV")))))
-               _ERROR("EVALUADOR: VALOR NULO EN "+FUN)
+               _ERROR("LA MONA DICE: VALOR NULO EN "+FUN+_CR+"Quizas no encerraste una expresión entre paréntesis")
                RETURN .F.
-            end*/
+            end
             if valtype(n)!="N"
                n:=alltrim(n)
                n:=strtran(n,chr(0),"")
@@ -2823,7 +2971,7 @@ LOCAL CX
                elseif ISNOTATION(n)==1
                   n:=e2d(n)
                else
-                  _ERROR("EVALUADOR: OPERANDO NO ES UN NUMERO "+n)
+                  _ERROR("LA MONA DICE: OPERANDO NO ES UN NUMERO "+n)
                   RETURN .F.
                end
             end
@@ -2831,6 +2979,13 @@ LOCAL CX
                return .F.
             end
             EXIT
+         
+         CASE 17   // "FNQ"
+            m:=p[++i]
+            
+            if !(_funExec[m]:EXEC(@pila,@par,@ITERACION))
+               return .F.
+            end
          END
       end   
       /*   else
@@ -2843,7 +2998,7 @@ LOCAL CX
 
    XLEN:=len(pila)
    if XLEN>1 
-      _ERROR("EVALUADOR: EXPRESION MAL FORMADA (QUEDAN "+hb_ntos(len(pila))+" RESULTADOS EN PILA).")
+      _ERROR("LA MONA DICE: EXPRESION MAL FORMADA (QUEDAN "+hb_ntos(len(pila))+" RESULTADOS EN PILA).")
       RETURN .F.
    end
 
@@ -3059,6 +3214,109 @@ RETURN nCIF
 
 /****** FUNCIONES DEL LENGUAJE *******/
 
+
+function funht(pila)  
+   AADD(pila,chr(9)+chr(0))
+return .T.
+
+function funvt(pila)
+   AADD(pila,chr(11)+chr(0))
+return .T.
+
+function funtpc(pila)   // TPC
+local h,n,o
+   h:=SDP(pila)
+   n:=SDP(pila) 
+   o:=SDP(pila)
+   if valtype(h)!="N"
+      h:=val(h)
+   end
+   if valtype(n)=="N"
+      n:=hb_ntos((n))
+   else
+      n:=strtran(n,chr(0),"")
+   end
+   if valtype(o)=="N"
+      o:=hb_ntos((o))
+   else
+      o:=strtran(o,chr(0),"")
+   end
+   AADD(pila, POSCHAR(o,n,h)+chr(0))
+return .T.
+
+function funeof(pila)
+   AADD(pila,iif(SWEOF,0,1))
+return .T.
+
+function funenv(pila)
+local n
+   n:=SDP(pila) 
+   if valtype(n)=="N"
+      n:=hb_ntos((n))
+   else
+      n:=strtran(n,chr(0),"")
+   end
+   AADD(pila,GETENV(n))
+return .T.
+
+function funsay(pila)
+local n
+   n:=SDP(pila) 
+   if valtype(n)=="N"
+/*     if ISTNUMBER(n)==1
+        AADD(pila,val(n))
+     elseif ISNOTATION(n)==1
+        n:=e2d(n)
+     else */
+        n:=hb_ntos((n))
+   //  end
+   else
+      n:=strtran(n,chr(0),"")
+   end
+   fwrite(1,n)
+return .T.
+
+function funnext(pila,par,ITERACION)   // NEXT
+local tmpPar               //? "PASA"
+   if SWBIG
+      nSavePos := FSEEK( fp, 0, 1 )  // rescata posicion anterior
+      //CX:=FREADSTR(fp,BUFFERLINEA)
+      //par := SUBSTR( CX, 1, at(hb_osnewline(),CX)-1)  // quito newline aqui
+      tmpPar:=par
+      par:=FREADSPECIAL(fp,BUFFERLINEA)
+      NUMTOK:=numtoken(par,DEFTOKEN)
+
+      nEol:=len(par)+1  // debe contar los caracteres especiales para el FSEEK
+      TC:=nSavePos+nEol  //TC+nEol
+      if TC > TOTALCAR
+          //_ERROR("LA MONA DICE: NEXT HA SUPERADO EL FIN DE ARCHIVO")
+          //hb_keyPut(27)
+          //i:=LENP+1
+          //SWSTOP:=.T.
+         FSEEK( fp, nSavePos, 0 )  // rescatamos la última posición válida
+         par:=tmpPar    // rescatamos la última línea leida
+         SWEOF:=.T.
+      else
+         FSEEK( fp, TC, 0 ) 
+         ++ITERACION
+      end
+   else
+      _ERROR("LA MONA DICE: NEXT SOLO SE PUEDE USAR CON LECTURA DE ARCHIVO")
+      RETURN .F.                  
+   end
+return .T.
+
+function funback(pila,par,ITERACION)   // BACK
+   if SWBIG
+      FSEEK( fp, nSavePos, 0 )  // posicion anterior.
+      --ITERACION
+   else
+      _ERROR("LA MONA DICE: BACK SOLO SE PUEDE USAR CON LECTURA DE ARCHIVO")
+      RETURN .F.                  
+   end
+
+return .T.
+
 //       "+","-","*","/","\","^","%","|","&",;   // O   93-101
 //       "<=",">=","<>","=","<",">"}  // P  102-107
 function funequal(pila,o,n,vtip)  // 105
@@ -3130,6 +3388,7 @@ function funplus(pila,o,n,vo,vn)  // 93
                   n:=strtran(n,chr(0),"")
                   AADD(pila, substr(n,o+1,len(n))+chr(0))
                else // sea numeros o strings
+                 // ? "N=",n," O=",o
                   n:=strtran(n,chr(0),"")
                   o:=strtran(o,chr(0),"")
                   AADD(pila,(o+n)+chr(0))  // concatena
@@ -3244,7 +3503,7 @@ function funaor(pila,o,n,vo,vn)  // 100
                      AADD(pila,iif(upper(o) $ upper(n),0,1))
                   end
                else
-                  _ERROR("EVALUADOR: TIPOS DISTINTOS EN OPERACION | (OR|CONTENIDO) ")
+                  _ERROR("LA MONA DICE: TIPOS DISTINTOS EN OPERACION | (OR|CONTENIDO) ")
                   RETURN .F.
                end
 return .T.
@@ -3282,7 +3541,7 @@ function funaand(pila,o,n,vo,vn)  // 101
                   end
                  // AADD(pila,CHARAND(o,n)+chr(0))
                else
-                  _ERROR("EVALUADOR: TIPOS DISTINTOS EN OPERACION & (AND|SUB EXACTO) ")
+                  _ERROR("LA MONA DICE: TIPOS DISTINTOS EN OPERACION & (AND|SUB EXACTO) ")
                   RETURN .F.
                end
 return .T.
@@ -3295,7 +3554,7 @@ function funshfr(pila,o,n,vo,vn)   // 102
             elseif vn=="CN"
                AADD(pila,CHARSHR(o,n)+chr(0))
             else
-               _ERROR("EVALUADOR: TIPOS DISTINTOS EN OPERACION BINARIA >> ")
+               _ERROR("LA MONA DICE: TIPOS DISTINTOS EN OPERACION BINARIA >> ")
                RETURN .F.
             end
 return .T.
@@ -3307,7 +3566,7 @@ function funshfl(pila,o,n,vo,vn)  // 103
             elseif vn=="CN"
                AADD(pila,CHARSHL(o,n)+chr(0))
             else
-               _ERROR("EVALUADOR: TIPOS DISTINTOS EN OPERACION BINARIA << ")
+               _ERROR("LA MONA DICE: TIPOS DISTINTOS EN OPERACION BINARIA << ")
                RETURN .F.
             end
 return .T.
@@ -3318,7 +3577,7 @@ function funoxor(pila,o,n,vo,vn)  // 104  xor
             elseif vn=="CC"
                AADD(pila,CHARXOR(o,n)+chr(0))
             else
-               _ERROR("EVALUADOR: TIPOS DISTINTOS EN OPERACION BINARIA ! (XOR) ")
+               _ERROR("LA MONA DICE: TIPOS DISTINTOS EN OPERACION BINARIA ! (XOR) ")
                RETURN .F.
             end
 return .T.
@@ -3402,10 +3661,10 @@ return .T.
 function funneg(pila, VARIABLE)
 LOCAL n,vn
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: EXPRESION MAL FORMADA EN OPERACION ~(EXPR) (NOT) ")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN OPERACION ~(EXPR) (NOT) ")
      RETURN .F.
-  end*/
+  end
   vn:=valtype(n)
   if vn=="N"
      if n!=0
@@ -3414,7 +3673,7 @@ LOCAL n,vn
         AADD(pila,1)
      end
   else
-     _ERROR("EVALUADOR: TIPO NUMERICO ESPERADO EN ~(EXPR) (NOT) ")
+     _ERROR("LA MONA DICE: TIPO NUMERICO ESPERADO EN ~(EXPR) (NOT) ")
      RETURN .F.
   end
 return .T.
@@ -3435,7 +3694,7 @@ return .T.
       
       hb_retl( 1 );
    }else{
-      fprintf(stderr, "EVALUADOR: @N RECIBE UN VALOR NULO\n");
+      fprintf(stderr, "LA MONA DICE: @N RECIBE UN VALOR NULO\n");
       hb_retl( 0 );
    }
 } */
@@ -3444,18 +3703,18 @@ function funmov(pila, VARTABLE)
 LOCAL o,n
   n:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(n,o)  //n==NIL .or. o==NIL
-     _ERROR("EVALUADOR: @N RECIBE UN VALOR NULO")
+  if esnulo(n,o)  //n==NIL .or. o==NIL
+     _ERROR("LA MONA DICE: @N RECIBE UN VALOR NULO"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end*/
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
-  if o>=1 .and. o<=20
+  if o>0 .and. o<=SIZEVAR
      VARTABLE[o]:=n
   else
-     _ERROR("EVALUADOR: REGISTRO "+HB_NTOS(o)+" NO EXISTE MOV(<<1..10>>,...) L:"+hb_ntos(i) )
+     _ERROR("LA MONA DICE: REGISTRO "+HB_NTOS(o)+" NO EXISTE MOV(<<1.."+hb_ntos(SIZEVAR)+">>,...) L:"+hb_ntos(i) )
      return .F.
   end
 return .T.
@@ -3463,10 +3722,10 @@ return .T.
 function funvar(pila, VARTABLE)
 local o
   o:=SDP(pila)
- /* if esnulo(o)   //o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN '@N'")
+  if esnulo(o)   //o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN '@N'"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -3474,7 +3733,7 @@ local o
   if o>=1 .and. o<=20
      aadd(PILA,VARTABLE[o])
   else
-     _ERROR("EVALUADOR: REGISTRO "+HB_NTOS(o)+" NO EXISTE @(<<1..10>>) L:"+hb_ntos(i) )
+     _ERROR("LA MONA DICE: REGISTRO "+HB_NTOS(o)+" NO EXISTE @(<<1..N>>) L:"+hb_ntos(i) )
      return .F.
   end
 return .T.
@@ -3482,10 +3741,10 @@ return .T.
 function funjnz(pila,p,i,LENP)
 LOCAL n,pilaif:={}
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN '?'")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN '?'"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if n!=NIL
      if valtype(n)=="N"
         n:=hb_ntos(n)
@@ -3524,12 +3783,12 @@ LOCAL n,pilaif:={}
            //++i
         end
         if len(pilaif)>0
-           _ERROR("EVALUADOR '?': EXPRESION << EXPR ? >> MAL FORMADA ")
+           _ERROR("LA MONA DICE RESPECTO A '?': EXPRESION << EXPR ? >> MAL FORMADA ")
            RETURN .F.
         end
      END
   else
-     _ERROR("EVALUADOR '?': NO EXISTE UNA EXPRESION PARA ? << EXPR ? >>")
+     _ERROR("LA MONA DICE RESPECTO A '?': NO EXISTE UNA EXPRESION PARA ? << EXPR ? >>")
      RETURN .F.
   end
 
@@ -3567,7 +3826,7 @@ LOCAL pilaif:={}
      //++i
   end
   if len(pilaif)>0
-     _ERROR("EVALUADOR ':': EXPRESION << EXPR ? >> MAL FORMADA")
+     _ERROR("LA MONA DICE RESPECTO A ':' : EXPRESION << EXPR ? >> MAL FORMADA")
      RETURN .F.
   end
 return .T.
@@ -3588,10 +3847,10 @@ function funround(pila,JMP,LENJMP,LENP,i)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN ROUND")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN ROUND"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -3606,10 +3865,10 @@ return .T.
 function funloop(pila,JMP,LENJMP,LENP,i)
   if LENJMP>0
      n:=SDP(pila)
- /*    if esnulo(n)   //n==NIL
-        _ERROR("EVALUADOR: VALOR NULO EN PUNTERO A DIRECCION LOOP")
+     if esnulo(n)   //n==NIL
+        _ERROR("LA MONA DICE: VALOR NULO EN PUNTERO A DIRECCION LOOP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
         RETURN .F.
-     end          */
+     end
      if valtype(n)!="N"
         n:=strtran(n,chr(0),"")
         n:=val(n)
@@ -3622,7 +3881,7 @@ function funloop(pila,JMP,LENJMP,LENP,i)
         i:=JMP[LENJMP]
      end
   else
-     _ERROR("EVALUADOR: LOOP sin POOL") 
+     _ERROR("LA MONA DICE: LOOP sin POOL") 
      return .F.
   end
 return .T.
@@ -3630,10 +3889,10 @@ return .T.
 function funutf8(pila,JMP,LENJMP,LENP,i)   
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN UTF8")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN UTF8"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end*/
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3646,10 +3905,10 @@ return .T.
 function funansi(pila,JMP,LENJMP,LENP,i)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN ANSI")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN ANSI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3663,10 +3922,10 @@ function funcat(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN CAT '{}'")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN CAT '{}'"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3691,10 +3950,10 @@ function funmatch(pila)
 LOCAL o,n,xvar,j,id,c3,ids
   n:=SDP(pila)  // palabras a buscar
   o:=SDP(pila)  // variable: debe ser string
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN MATCH")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN MATCH"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)=="N"
      o:=hb_ntos(o)
   else
@@ -3729,10 +3988,10 @@ return .T.
 function funlenstr(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN LEN")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN LEN"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      AADD(pila,len(alltrim(str((n)))))
   else
@@ -3746,10 +4005,10 @@ LOCAL m,n,o
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN SUB")
+  if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN SUB"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(m)!="N"
      m:=strtran(m,chr(0),"")
      m:=val(m)
@@ -3775,10 +4034,10 @@ function funat(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN AT")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN AT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3801,10 +4060,10 @@ LOCAL o,n,h
   o:=SDP(pila)
   n:=SDP(pila)
   h:=SDP(pila)
-/*  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or.h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN RANGE")
+  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or.h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN RANGE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end*/
+  end
   if valtype(h)=="N"
      h:=hb_ntos(h)
   end
@@ -3825,10 +4084,10 @@ LOCAL x,o,n,y
   x:=SDP(pila)  // ocurrencia
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o,x)   //n==NIL.or.o==NIL.or.x==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN ATA")
+  if esnulo(n,o,x)   //n==NIL.or.o==NIL.or.x==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN ATA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(x)!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
@@ -3854,10 +4113,10 @@ function funaf(pila)
 LOCAL n,o,j,id,ids,sw:=.F.
   n:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN AF")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN AF"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3900,10 +4159,10 @@ function funrat(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN RAT")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN RAT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3925,10 +4184,10 @@ function funptrp()
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN PTRP {+S}")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN PTRP {+S}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3945,10 +4204,10 @@ function funptrm(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN PTRM {-S}")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN PTRM {-S}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -3966,10 +4225,10 @@ function funcp(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN CP")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN CP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -3988,10 +4247,10 @@ LOCAL m,n,o
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TR")
+  if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TR"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(m)=="N"
      m:=hb_ntos(m)
   else
@@ -4017,10 +4276,10 @@ LOCAL x,h,m,n,o
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,m,h,x)   //n==NIL.or.o==NIL.or.x==NIL.or.h==NIL.or.m==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TRA")
+  if esnulo(n,o,m,h,x)   //n==NIL.or.o==NIL.or.x==NIL.or.h==NIL.or.m==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TRA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)!="N"
         h:=strtran(h,chr(0),"")
         h:=val(h)
@@ -4048,9 +4307,6 @@ LOCAL x,h,m,n,o
   else
      o:=strtran(o,chr(0),"")
   end
-  
-  
-  
   AADD(pila,strtran(o,n,m,h,x)+chr(0))
 return .T.
 
@@ -4060,10 +4316,10 @@ LOCAL h,m,n,o
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TRB")
+  if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TRB"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)!="N"
         h:=strtran(h,chr(0),"")
         h:=val(h)
@@ -4091,10 +4347,10 @@ LOCAL x,n,o,id,ids,j,y,sw:=.F.
   x:=SDP(pila)  // ocurrencia
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,x)   //n==NIL.or.o==NIL.or.x==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN AFA")
+  if esnulo(n,o,x)   //n==NIL.or.o==NIL.or.x==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN AFA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(x)!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
@@ -4151,10 +4407,10 @@ function funtk(pila,tBUFFER)
 LOCAL m,o,n
   m:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(m,o)   //m==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TK $N")
+  if esnulo(m,o)   //m==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TK $N"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(m)!="N"
      m:=strtran(m,chr(0),"")
      m:=val(m)
@@ -4168,7 +4424,7 @@ LOCAL m,o,n
  // if m==0
  //    AADD(pila,par+chr(0))
   if m<=0
-     _ERROR("EVALUADOR: NO ACEPTO UN INDICE DE TOKEN NEGATIVO O CERO")
+     _ERROR("LA MONA DICE: NO ACEPTO UN INDICE DE TOKEN NEGATIVO O CERO")
      return .F.
   else
 /*     if m>NUMTOK
@@ -4194,10 +4450,10 @@ function funlet(pila,tBUFFER)
 LOCAL h,o
   h:=SDP(pila)  // string.
   o:=SDP(pila)  // linea.debe ser un número
- /* if esnulo(h,o)   //h==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN LET")
+  if esnulo(h,o)   //h==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN LET"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)=="N"
      h:=hb_ntos(h)
   else
@@ -4212,7 +4468,7 @@ LOCAL h,o
   if o>0 .and. o<=len(tBUFFER)
      tBUFFER[o]:=h
   else
-     _ERROR("EVALUADOR: LINEA REFERENCIADA EN LET NO EXISTE")
+     _ERROR("LA MONA DICE: LINEA REFERENCIADA EN LET NO EXISTE")
      return .F.
   end
 return .T.
@@ -4222,16 +4478,16 @@ LOCAL h,o,n,c1,c2,j,str,xvar
   h:=SDP(pila)  // token 2. puede ser un string.
   n:=SDP(pila)  // token 1. debe ser un numero, indice de token
   o:=SDP(pila)  // linea
- /* if esnulo(n,o,h)   //n==NIL.or.o==NIL.or.h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TKLET")
+  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or.h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TKLET"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
   end
   if o==NIL
-     _ERROR("EVALUADOR: LINEA REFERENCIADA EN TKLET NO EXISTE")
+     _ERROR("LA MONA DICE: LINEA REFERENCIADA EN TKLET NO EXISTE")
      return .F.
   end
   o:=strtran(o,chr(0),"")
@@ -4269,19 +4525,20 @@ return .T.
 function funcopy(pila,tBUFFER)
 LOCAL n
   n:=SDP(pila)
- /* if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN COPY")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN COPY"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if n==NIL
-     _ERROR("EVALUADOR: NO ENCUENTRO UN DATO VALIDO PARA COPIAR EN BUFFER <<COPY(null)>>")
+/*  if n==NIL
+     _ERROR("LA MONA DICE: NO ENCUENTRO UN DATO VALIDO PARA COPIAR EN BUFFER <<COPY(null)>>")
      RETURN .F.
-  elseif len(n)>0 .and. n!="0"
+  else*/
+  if len(n)>0 .and. n!="0"
      AADD(tBUFFER,alltrim(n))
   end
 return .T.
@@ -4289,10 +4546,10 @@ return .T.
 function fungloss(pila,tBUFFER)
 LOCAL n
   n:=SDP(pila)
- /* if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN GLOSS")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN GLOSS"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      IF ABS(n)>INFINITY().or. (ABS(n)>0.and.ABS(n)<0.000000000001)
         n:=D2E(n,10)
@@ -4309,10 +4566,10 @@ return .T.
 function funtri(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TRI")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TRI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4324,10 +4581,10 @@ return .T.
 function funltri(pila)
 LOCAL n
   n:=SDP(pila)
- /* if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN LTRI")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN LTRI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4339,10 +4596,10 @@ return .T.
 function funrtri(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN RTRI")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN RTRI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4354,10 +4611,10 @@ return .T.
 function funup(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN UP")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN UP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4370,10 +4627,10 @@ return .T.
 function funlow(pila)
 LOCAL n
   n:=SDP(pila)
- /* if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN LOW")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN LOW"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4388,7 +4645,7 @@ LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)  // debe sacarlo, porque sino, no reemplaza
 //  if esnulo(n,o)   //n==NIL.or.o==NIL
-//     _ERROR("EVALUADOR: VALOR NULO EN RP")
+//     _ERROR("LA MONA DICE: VALOR NULO EN RP")
 //     RETURN .F.
 //  end
   if valtype(o)=="N"
@@ -4403,10 +4660,10 @@ LOCAL m,n,o,ids,id,j,c1,c2
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TRE")
+  if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TRE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(m)=="N"
      m:=hb_ntos(m)
   else
@@ -4446,10 +4703,10 @@ LOCAL h,m,n,o,id,ids,j,c1,c2
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TREB")
+  if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TREB"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)!="N"
      h:=strtran(h,chr(0),"")
      h:=val(h)
@@ -4505,10 +4762,10 @@ LOCAL x,k,h,m,n,o,id,ids,j,c1,c2
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,m,h,x)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL.or.x==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN TREA")
+  if esnulo(n,o,m,h,x)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL.or.x==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN TREA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(x)!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
@@ -4574,10 +4831,10 @@ LOCAL m,n,o,xvar
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN INS")
+  if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN INS"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(m)!="N"
      m:=strtran(m,chr(0),"")
      m:=val(m)
@@ -4607,10 +4864,10 @@ LOCAL m,n,o
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN RPC")
+  if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN RPC"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(m)=="N"
      m:=hb_ntos(m)
   else
@@ -4634,10 +4891,10 @@ function funone(pila)
 LOCAL n,o
   n:=SDP(pila)  // caracter a reducir
   o:=SDP(pila)  // variable: debe ser string
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN ONE")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN ONE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4655,10 +4912,10 @@ function fundc(pila)
 LOCAL n,o
   n:=SDP(pila)  // caracteres a eliminar
   o:=SDP(pila)  // variable: debe ser string
- /* if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN DC")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN DC"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4675,10 +4932,10 @@ return .T.
 function funrnd(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN RND")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN RND"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -4689,10 +4946,10 @@ return .T.
 function funval(pila,tBUFFER)
 LOCAL n
   n:=SDP(pila)
- /* if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN VAL")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN VAL"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
     // if len(n)>0
@@ -4701,7 +4958,7 @@ LOCAL n
      elseif ISNOTATION(n)==1
         AADD(pila,e2d(n))
      else
-        _ERROR("EVALUADOR: CONVERSION NO VALIDA EN VAL <<VAL( STRING-NO-NUMERIC )>>")
+        _ERROR("LA MONA DICE: CONVERSION NO VALIDA EN VAL <<VAL( STRING-NO-NUMERIC )>>")
         RETURN .F.
      end
     // else
@@ -4715,10 +4972,10 @@ return .T.
 function funstr(pila,tBUFFER)
 LOCAL n
   n:=SDP(pila)
- /* if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN STR")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN STR"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      AADD(pila,hb_ntos(n)+chr(0))
   else
@@ -4730,10 +4987,10 @@ return .T.
 function funch(pila,tBUFFER)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN CH")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN CH"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -4744,10 +5001,10 @@ return .T.
 function funasc(pila,tBUFFER)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN ASC")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN ASC"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4763,10 +5020,10 @@ return .T.
 function funlin(pila,tBUFFER)
 LOCAL n,v
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN LIN")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN LIN"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -4787,7 +5044,7 @@ LOCAL n,v
         AADD(pila,BUFFER[n])
      end
   else
-     _ERROR("EVALUADOR: NO EXISTE LA LINEA PEDIDA EN EL BUFFER (LIN)")
+     _ERROR("LA MONA DICE: NO EXISTE LA LINEA PEDIDA EN EL BUFFER (LIN)")
      RETURN .F.
   end
 return .T.
@@ -4796,10 +5053,10 @@ function funpc(pila,tBUFFER)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN PC")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN PC"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4817,10 +5074,10 @@ function funpl(pila,tBUFFER)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN PL")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN PL"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4838,10 +5095,10 @@ function funpr(pila,tBUFFER)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
- /* if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN PR")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN PR"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -4859,10 +5116,10 @@ function funmsk(pila)
 LOCAL n,o,c1,c2
   n:=SDP(pila)  // relleno y mascara
   o:=SDP(pila)  // variable: debe ser numerico
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN MSK")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN MSK"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)=="N"
      o:=hb_ntos(o)
   else
@@ -4885,10 +5142,10 @@ LOCAL h,n,m,o,c1,c2
   m:=SDP(pila)  // ancho
   n:=SDP(pila)  // relleno y signo moneda
   o:=SDP(pila)  // variable: debe ser numerico
-/*  if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN MON")
+  if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN MON"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)!="N"
      h:=strtran(h,chr(0),"")
      h:=val(h)
@@ -4915,10 +5172,10 @@ function funsat(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN SAT")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN SAT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)=="N"
      o:=hb_ntos(o)
   else
@@ -4937,10 +5194,10 @@ return .T.
 function fundeft(pila)
 LOCAL h
   h:=SDP(pila)  // string.
- /* if esnulo(h)   //h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN DEFT")
+  if esnulo(h)   //h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN DEFT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)=="N"
      h:=hb_ntos(h)
   else
@@ -4956,10 +5213,10 @@ LOCAL h,n,o
   h:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
-/*  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or. h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN IF")
+  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or. h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN IF"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)=="N"
      h:=hb_ntos(h)
   else
@@ -4988,10 +5245,10 @@ LOCAL h,n,o
   h:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,h)   //n==NIL.or.o==NIL.or. h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN IFLE")
+  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or. h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN IFLE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)=="N"
      h:=hb_ntos(h)
   else
@@ -5019,10 +5276,10 @@ LOCAL h,n,o
   h:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
- /* if esnulo(n,o,h)   //n==NIL.or.o==NIL.or. h==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN IFGE")
+  if esnulo(n,o,h)   //n==NIL.or.o==NIL.or. h==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN IFGE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(h)=="N"
      h:=hb_ntos(h)
   else
@@ -5049,10 +5306,10 @@ function funand(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
- /* if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN AND")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN AND"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -5068,10 +5325,10 @@ function funor(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
- /* if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN OR")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN OR"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -5087,10 +5344,10 @@ function funxor(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN XOR")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN XOR"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(o)!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -5105,10 +5362,10 @@ return .T.
 function funnot(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN NOT")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN NOT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5120,10 +5377,10 @@ function funbit(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN BIT")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN BIT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5139,10 +5396,10 @@ function funon(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
- /* if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN ON")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN ON"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5158,10 +5415,10 @@ function funoff(pila)
 LOCAL o,n
   o:=SDP(pila)
   n:=SDP(pila)
-/*  if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN OFF")
+  if esnulo(n,o)   //n==NIL.or.o==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN OFF"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5176,10 +5433,10 @@ return .T.
 function funbin(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN BIN")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN BIN"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5190,10 +5447,10 @@ return .T.
 function funhex(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN HEX")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN HEX"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5205,10 +5462,10 @@ return .T.
 function fundec(pila)
 LOCAL n,c1,c2,c,num,j,xt
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN DEC")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN DEC"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)=="N"
      n:=hb_ntos(n)
   else
@@ -5218,7 +5475,7 @@ LOCAL n,c1,c2,c,num,j,xt
   c1:=substr(n,1,2)
   c2:=substr(n,len(n),1)
   if c1!="0x" .or. !(c2 $ "bho")
-     _ERROR("EVALUADOR: BASE NUMERICA NO RECONOCIDA: "+n)
+     _ERROR("LA MONA DICE: BASE NUMERICA NO RECONOCIDA: "+n)
        RETURN .F.
   end
   n:=substr(n,3,len(n))
@@ -5238,7 +5495,7 @@ LOCAL n,c1,c2,c,num,j,xt
        for j:=1 to len(num)
          xt:=substr(num,j,1)
          if xt!="0" .and. xt!="1"
-           _ERROR("EVALUADOR: NUMERO BINARIO MAL FORMADO: "+num)
+           _ERROR("LA MONA DICE: NUMERO BINARIO MAL FORMADO: "+num)
            RETURN .F.
          end
        end
@@ -5247,7 +5504,7 @@ LOCAL n,c1,c2,c,num,j,xt
        for j:=1 to len(num)
          xt:=substr(num,j,1)
          if !(xt $ "01234567")
-           _ERROR("EVALUADOR: NUMERO OCTAL MAL FORMADO: "+num)
+           _ERROR("LA MONA DICE: NUMERO OCTAL MAL FORMADO: "+num)
            RETURN .F.
          end
        end
@@ -5257,17 +5514,17 @@ LOCAL n,c1,c2,c,num,j,xt
        for j:=1 to len(num)
          xt:=substr(num,j,1)
          if !(xt $ "0123456789ABCDEF")
-            _ERROR("EVALUADOR: NUMERO HEXADECIMAL MAL FORMADO: "+num)
+            _ERROR("LA MONA DICE: NUMERO HEXADECIMAL MAL FORMADO: "+num)
             RETURN .F.
          end
        end
        num:=HEXATODEC(num)
      else   // no es ninguna hueá: error!
-       _ERROR("EVALUADOR: BASE NUMERICA NO RECONOCIDA: "+num)
+       _ERROR("LA MONA DICE: BASE NUMERICA NO RECONOCIDA: "+num)
        RETURN .F.
      end
   else
-     _ERROR("EVALUADOR: NO HAY NUMERO A CONVERTIR: "+num)
+     _ERROR("LA MONA DICE: NO HAY NUMERO A CONVERTIR: "+num)
        RETURN .F.
   end
   AADD(pila,num)
@@ -5276,10 +5533,10 @@ return .T.
 function funoct(pila)
 LOCAL n
   n:=SDP(pila)
-/*  if esnulo(n)   //n==NIL
-     _ERROR("EVALUADOR: VALOR NULO EN OCT")
+  if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN OCT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
-  end */
+  end
   if valtype(n)!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
@@ -5455,7 +5712,7 @@ local DICC
 */
 DICC:={"NT","I","VAR","MOV","~","L",;   // A 1-6
        "JNZ","ELSE","ENDIF",;   // B 7-9
-       "POOL","LOOP","ROUND","UTF8","ANSI",;           // C 10-14
+       "DO","UNTIL","ROUND","UTF8","ANSI",;           // C 10-14
        "CAT","MATCH","LEN","SUB","AT","RANGE","ATA",;  // D 15-21
        "AF","RAT","PTRP","PTRM","CP","TR","TRA","TRB","AFA",;  // E 22-30
        "TK","TKLET","LET","COPY","FILE","GLOSS",;    // F    31-36
@@ -5463,10 +5720,11 @@ DICC:={"NT","I","VAR","MOV","~","L",;   // A 1-6
        "TRE","INS","DC","RPC","ONE","RND","TREA","TREB",;       // H  43-50
        "VAL","STR","CH","ASC","LIN","PC","PL","PR",;    // I   51-58
        "MSK","MON","SAT","DEFT","IF","IFLE","IFGE","CLEAR",; // J   59-66
-       "NOP","AND","OR","XOR",;    // K  67-70
+       "STOP","AND","OR","XOR",;    // K  67-70
        "NOT","BIT","ON","OFF","BIN","HEX","DEC","OCT",; // L  71-78
        "LN","LOG","SQRT","ABS","INT","CEIL","EXP","NL",;  // M  79-85
-       "FLOOR","SGN","SIN","COS","TAN","INV","NEXT","BACK","TPC","HT","VT"}   //N  86-91 (inv)
+       "FLOOR","SGN","SIN","COS","TAN","INV","NEXT",;
+       "BACK","TPC","HT","VT","EOF","ENV","SAY"}   //N  86-91 (inv)
                              
 //long:=len(DICC)
 //_pos:=Ascan(DICC, arg)
