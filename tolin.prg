@@ -2854,6 +2854,10 @@ LOCAL CX,tmpPar
             m:=p[++i]
             if m==37  // reemplaza el parametro por un nuevo valor
                o:=SDP(pila)
+               if esnulo(o)   //n==NIL
+                  _ERROR("LA MONA DICE: VALOR NULO EN RP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+                  RETURN .F.
+               end
                if valtype(o)=="N"
                   o:=hb_ntos(o)
                else
