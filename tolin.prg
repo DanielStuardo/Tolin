@@ -63,9 +63,10 @@ public SWSTOP:=.F.
 public SWEOF:=.F.
 public NUMTOK:=0
 public SIZEVAR:=20
+public VARTABLE:={}
 
 // array de punteros a funciones
-public _funExec:=array(118)
+public _funExec:=array(121)
 
 _funExec[1]:=0
 _funExec[2]:=0
@@ -201,6 +202,9 @@ _funExec[115]:=@funvt()   // VT
 _funExec[116]:=@funeof()  // EOF
 _funExec[117]:=@funenv()  // getENV 
 _funExec[118]:=@funsay()  // say
+_funExec[119]:=@funputl()  // put linea 
+_funExec[120]:=@fungetl()  // get linea
+_funExec[121]:=@funload()  // load
 
 /*_funExec[102]:=@funle()
 _funExec[103]:=@funge()
@@ -730,6 +734,10 @@ SWKEEPVACIO:=.F.
 SWBUFFER:=.F.
 SWRESET:=.F.
 SWSINGLE:=.F.
+
+VARTABLE:=ARRAY(SIZEVAR)
+AFILL(VARTABLE,"")
+
 if len(alltrim(_file))>1
    Q:=_CTRLL_OBTIENELISTA(_file)
 
@@ -1786,6 +1794,58 @@ while i <= long
             long:=LEN(DX)
             i:=tmpi  // restauro indice para que lea "MOV"
             //  ? "DX?=", DX
+
+         elseif c=="["   // es un indice linea
+            inum:=""
+            ctmpi:=i
+            strfun:=""
+            i+=2  // para saltarme primer "("
+            ctpar:=1
+            while i<=long
+               c:=substr(DX,i,1)
+               if c=="]"  // cierra composicion
+                  ++i
+                  exit
+               end
+               inum+=c
+               ++i
+            end
+            c:=substr(DX,i,1)
+            if c=="("  // es una asignacion
+               // busco hasta donde asigna:
+               ctmpi:=i
+               strfun:=c
+               ++i
+               //i+=2  // para saltarme primer "("
+               ctpar:=1
+               while i<=long
+                  c:=substr(DX,i,1)
+                  strfun+=c
+                  if c=="("
+                     ++ctpar
+                  elseif c==")"
+                     --ctpar
+                     if ctpar==0
+                        exit
+                     end
+                     if ctpar<0
+                        _ERROR("EL CHOLITO DICE: PARENTESIS DESBALANCEADOS: "+substr(DX,1,i)+"<<")
+                        RETURN {}
+                     end
+                  end
+                  ++i
+               end
+               DX:=substr(DX,1,tmpi)+"PUTL("+num+","+inum+","+strfun+")"+substr(DX,++i,len(DX))
+               long:=LEN(DX)
+               i:=tmpi  // restauro indice para que lea "TKLET"
+//            ? "DX=",DX
+            else   // es una linea
+               DX:=substr(DX,1,tmpi)+"GETL("+num+","+inum+")"+substr(DX,i,len(DX))
+               long:=LEN(DX)
+               i:=tmpi  // restauro indice para que lea "TKLET"
+//            ? "DX=",DX
+            end
+
          else
             AADD(Q,"VAR"); AADD(R,"VAR")
             AADD(Q,"("); AADD(R,"(")
@@ -2093,7 +2153,7 @@ cFUN:={"FNA","FNA","FNA","FNA","FNA","FNA",;
        "FNN","FNN","FNN","FNN","FNN","FNN","FNN",;
        "FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO","FNO",;
        "FNP","FNP","FNP","FNP","FNP","FNP",;
-       "FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ"}
+       "FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ","FNQ"}
 
 nFUN:={"FNA","FNB","FNC","FND","FNE","FNF","FNG","FNH","FNI","FNJ","FNK","FNL","FNM","FNN","FNO","FNP","FNQ"}  // "FNA-FNQ"
 
@@ -2113,7 +2173,7 @@ DICC:={"NT","I","VAR","MOV","~","L",;   // A
        "FLOOR","SGN","SIN","COS","TAN","INV","NL",;       // N- inv=91; NEWLINE se evalua aparte.
        "+","-","*","/","\","^","%","|","&",">>","<<","!",;   // O   93-104 (ex-101)
        "<=",">=","<>","=","<",">",;  // P 105-110 
-       "NEXT","BACK","TPC","HT","VT","EOF","ENV","SAY"}   // Q  111-118
+       "NEXT","BACK","TPC","HT","VT","EOF","ENV","SAY","PUTL","GETL","LOAD"}   // Q  111-118
 /*   */
 
 
@@ -2448,7 +2508,7 @@ aadd(pila2,"(")
             end
             aadd(pila,"N")
          
-         elseif isany(m,"SUB","INS","RPC","IF","IFLE","IFGE","TKLET")
+         elseif isany(m,"SUB","INS","RPC","IF","IFLE","IFGE","TKLET","PUTL")
              //m=="SUB".or. m=="INS" .or. m=="RPC".or. m=="IF".or. m=="IFLE".or.m=="IFGE" .or.m=="TKLET"
             h:=SDP(pila)
             n:=SDP(pila)
@@ -2477,7 +2537,7 @@ aadd(pila2,"(")
             else
                aadd(pila,"N")
             end
-         elseif isany(m,"CAT","CP","PTRP","PTRM","ONE","PL","PC","PR","MSK","SAT","DC")
+         elseif isany(m,"CAT","CP","PTRP","PTRM","ONE","PL","PC","PR","MSK","SAT","DC","GETL")
             //  m=="CAT" .or. m=="CP".or.m=="PTRP".or.m=="PTRM" .or. m=="ONE".or. m=="PL".or.m=="PC".or.m=="PR".or.m=="MSK".or.m=="SAT" .or.m=="DC"
             o:=SDP(pila)
             n:=SDP(pila)
@@ -2509,7 +2569,6 @@ aadd(pila2,"(")
             aadd(pila,"C")
 
          elseif isany(m,"LET","MOV") 
-            //m=="LET" .or. m=="MOV"
             h:=SDP(pila)
             n:=SDP(pila)
             if esnulo(n,h) //h==NIL .or. n==NIL
@@ -2529,7 +2588,7 @@ aadd(pila2,"(")
             //m=="POOL" .or. m=="CLEAR" .or. m=="JNZ" .or. m=="ELSE" .or. m=="ENDIF".or. m=="NEXT".or.m=="BACK"
             ;
             
-         elseif isany(m,"CH","STR","GLOSS","ENV")
+         elseif isany(m,"CH","STR","GLOSS","ENV","LOAD")
             //m=="CH" .or. m=="STR" .or. m=="GLOSS"
             n:=SDP(pila)
             if n==NIL
@@ -2563,7 +2622,11 @@ aadd(pila2,"(")
                _ERROR("LA PERLA DICE: EXPRESION MAL FORMADA. FALTA ARGUMENTO ("+m+")")
                RETURN .F.
             end
-           
+            if m=="SAY"
+               while (SDP(pila) != NIL)
+                  ;
+               end
+            end
             
          elseif isany(m,"I","NT","L","EOF")
             //m=="I" .or. m=="NT".or.m=="L"  //.or.m=="LINEEND"
@@ -2634,20 +2697,14 @@ RETURN p2
 
 FUNCTION _EVALUA_EXPR(p,par,ITERACION,tBUFFER,FILENAME,ENDFILE)
 LOCAL res,pila,m,n,o,h,x,y,k,i,j,id:=0,ids:=0,c1,c2,c3,str,nLength,xvar,ope:=0,vtip
-LOCAL VARTABLE,JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tmpPos,swFound,tmpo,tmpn
+LOCAL JMP:={},LENJMP:=0,vn,vo,SWEDIT:=.F.,num,LENP,pilaif,tmpPos,swFound,tmpo,tmpn
 LOCAL CX,tmpPar
 //LOCAL tmpAT,tmpATF,swAF,swAT
 
    pila:={}
    pilaif:={}
    tmpPos:=0   // guarda la ultima posicion de RANGE, para busquedas iterativas, por linea
-   
-//   tmpAT:=0    // guarda ultima posicion de AT por linea.
-//   tmpATF:=0   // idem para AF
-//   swAF:=.F.   // si ya hizo una búsqueda en la linea.
-//   swAT:=.F.
-   VARTABLE:=ARRAY(SIZEVAR)
-   afill(VARTABLE,"")
+
    NUMTOK:=numtoken(par,DEFTOKEN)
 //   if pcount()==5
       SWEDIT:=.T.
@@ -2692,6 +2749,11 @@ LOCAL CX,tmpPar
             end
             vn:=valtype(n)
             vo:=valtype(o)
+            if vn=="A" .or. vo=="A"
+               _ERROR("LA MONA DICE: DEBE INDICAR UN INDICE PARA ESTA VARIABLE")
+               RETURN .F.
+            end
+            
             if vn=="C"
                if right(n,1)!=chr(0)  //!(chr(0) $ n)
                   c1:=alltrim(n)
@@ -2745,6 +2807,10 @@ LOCAL CX,tmpPar
             end
             vn:=valtype(n)
             vo:=valtype(o)
+            if vn=="A" .or. vo=="A"
+               _ERROR("LA MONA DICE: DEBE INDICAR UN INDICE PARA ESTA VARIABLE")
+               RETURN .F.
+            end
             if vn=="C"
                if right(n,1)!=chr(0)  //!(chr(0) $ n)
                   c1:=alltrim(n)
@@ -2796,7 +2862,7 @@ LOCAL CX,tmpPar
             elseif m==6
                AADD(pila,len(par))
             else
-               if !(_funExec[m]:EXEC(@pila,@VARTABLE))
+               if !(_funExec[m]:EXEC(@pila))
                   return .F.
                end
             end
@@ -2858,7 +2924,12 @@ LOCAL CX,tmpPar
                   _ERROR("LA MONA DICE: VALOR NULO EN RP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
                   RETURN .F.
                end
-               if valtype(o)=="N"
+               vo:=valtype(o)
+               if vo=="A"
+                  _ERROR("LA MONA DICE: DEBE INDICAR UN INDICE PARA ESTA VARIABLE")
+                  RETURN .F.
+               end
+               if vo=="N"
                   o:=hb_ntos(o)
                else
                   o:=strtran(o,chr(0),"")
@@ -2937,7 +3008,12 @@ LOCAL CX,tmpPar
                _ERROR("LA MONA DICE: VALOR NULO EN "+FUN+_CR+"Quizas no encerraste una expresión entre paréntesis")
                RETURN .F.
             end
-            if valtype(n)!="N"
+            vn:=valtype(n)
+            if vn=="A"
+               _ERROR("LA MONA DICE: DEBE INDICAR UN INDICE PARA ESTA VARIABLE")
+               RETURN .F.
+            end
+            if vn!="N"
                n:=alltrim(n)
                n:=strtran(n,chr(0),"")
                if ISTNUMBER(n)==1
@@ -2967,7 +3043,12 @@ LOCAL CX,tmpPar
                _ERROR("LA MONA DICE: VALOR NULO EN "+FUN+_CR+"Quizas no encerraste una expresión entre paréntesis")
                RETURN .F.
             end
-            if valtype(n)!="N"
+            vn:=valtype(n)
+            if vn=="A"
+               _ERROR("LA MONA DICE: DEBE INDICAR UN INDICE PARA ESTA VARIABLE")
+               RETURN .F.
+            end
+            if vn!="N"
                n:=alltrim(n)
                n:=strtran(n,chr(0),"")
                if ISTNUMBER(n)==1
@@ -3228,19 +3309,26 @@ function funvt(pila)
 return .T.
 
 function funtpc(pila)   // TPC
-local h,n,o
+local h,n,o,vh,vn,vo
    h:=SDP(pila)
    n:=SDP(pila) 
    o:=SDP(pila)
-   if valtype(h)!="N"
+   vh:=valtype(h)
+   vo:=valtype(o)
+   vn:=valtype(n)
+   if esarray(vh,vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TPC(X:NUM,Y:STR,Z:STR)")
+      RETURN .F.
+   end
+   if vh!="N"
       h:=val(h)
    end
-   if valtype(n)=="N"
+   if vn=="N"
       n:=hb_ntos((n))
    else
       n:=strtran(n,chr(0),"")
    end
-   if valtype(o)=="N"
+   if vo=="N"
       o:=hb_ntos((o))
    else
       o:=strtran(o,chr(0),"")
@@ -3253,31 +3341,156 @@ function funeof(pila)
 return .T.
 
 function funenv(pila)
-local n
-   n:=SDP(pila) 
-   if valtype(n)=="N"
+local n,vn
+   n:=SDP(pila)
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN ENV(X:STR)")
+      RETURN .F.
+   end
+   if vn=="N"
       n:=hb_ntos((n))
    else
       n:=strtran(n,chr(0),"")
    end
-   AADD(pila,GETENV(n))
+   AADD(pila,GETENV(n)+chr(0))
+return .T.
+
+function funload(pila)
+local fp,n,cBuff,nNumCar,lineas,h,vn
+   n:=SDP(pila)
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN LOAD(X:STR)")
+      RETURN .F.
+   end
+   if vn!="C"
+      _ERROR("LA MONA DICE: LOAD NECESITA UN ARCHIVO QUE CARGAR")
+      RETURN .F.
+   end
+   h:=CUENTALINEAS(n)
+   
+   fp:=fopen(n,0)
+   if ferror()==0
+      nNumCar:=fseek(fp,0,2)
+      fseek(fp,0,0)
+      cBuff:=freadstr(fp,nNumCar)
+      lineas:=GETFLINEAS(cBuff,h[1])
+      aadd(pila,lineas)
+      fclose(fp)
+ /*     for i:=1 to len(lineas)
+        ? "L:",i," = ",lineas[i]
+      end */
+   else
+      _ERROR("LA MONA DICE: LOAD NO PUEDE CARGAR EL ARCHIVO "+n)
+      RETURN .F.
+   end
+return .T.
+
+function fungetl(pila)
+local n,v,vn,vv
+  n:=SDP(pila)  // linea
+  v:=SDP(pila)  // VARTABLE
+  if esnulo(n,v)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN @N[X:NUM]")
+     RETURN .F.
+  end
+   vn:=valtype(n)
+   vv:=valtype(v)
+   if esarray(vn,vv)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN @N:NUM[X:NUM]")
+      RETURN .F.
+   end
+  if vv!="N"
+     v:=strtran(v,chr(0),"")
+     v:=val(v)
+  end
+  if vn!="N"
+     n:=strtran(n,chr(0),"")
+     n:=val(n)
+  end
+  if v<=SIZEVAR .and. n<=len(VARTABLE[v]) 
+     if v>0 .and. n>0
+        aadd(pila,VARTABLE[v][n])
+     else
+        _ERROR("LA MONA DICE: NO EXISTE LA LINEA INDICADA EN @N:NUM[X:NUM]")
+        RETURN .F.     
+     end
+  else
+     _ERROR("LA MONA DICE: NO EXISTE LA LINEA INDICADA EN @N:NUM[X:NUM]")
+     RETURN .F.
+  end
+return .T.
+
+function funputl(pila)
+local n,v,w,vn,vv
+  w:=SDP(pila)  // valor
+  n:=SDP(pila)  // indice
+  v:=SDP(pila)  // VARTABLE
+  if esnulo(n,v,w)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN @N:NUM[X:NUM](VALOR)")
+     RETURN .F.
+  end
+   vn:=valtype(n)
+   vv:=valtype(v)
+  // vw:=valtype(w)
+   if esarray(vn,vv)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN @N:NUM[X:NUM](VALOR)")
+      RETURN .F.
+   end
+
+  if vn!="N"
+     n:=strtran(n,chr(0),"")
+     n:=val(n)
+  end
+  if vv!="N"
+     v:=strtran(v,chr(0),"")
+     v:=val(v)
+  end
+  if v<=SIZEVAR .and. n<=len(VARTABLE[v]) 
+     if v>0 .and. n>0
+        VARTABLE[v][n]:=w
+     else
+        _ERROR("LA MONA DICE: NO EXISTE LA LINEA INDICADA EN @N:NUM[X:NUM](VALOR)")
+        RETURN .F.     
+     end
+  else
+     _ERROR("LA MONA DICE: NO EXISTE LA LINEA INDICADA EN @N:NUM[X:NUM](VALOR)")
+     RETURN .F.
+  end
 return .T.
 
 function funsay(pila)
-local n
-   n:=SDP(pila) 
-   if valtype(n)=="N"
-/*     if ISTNUMBER(n)==1
-        AADD(pila,val(n))
-     elseif ISNOTATION(n)==1
-        n:=e2d(n)
-     else */
-        n:=hb_ntos((n))
-   //  end
+local n,vn
+   n:=SDC(pila)
+   if esnulo(n)   //n==NIL
+     _ERROR("LA MONA DICE: VALOR NULO EN SAY")
+     RETURN .F.
+   end
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN SAY(VALOR)")
+      RETURN .F.
+   end
+   if vn=="N"
+      n:=hb_ntos((n))
    else
       n:=strtran(n,chr(0),"")
    end
    fwrite(1,n)
+   while ((n:=SDC(pila))!=NIL) 
+      vn:=valtype(n)
+      if esarray(vn)
+         _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN SAY(VALOR)")
+         RETURN .F.
+      end
+      if vn=="N"
+         n:=hb_ntos((n))
+      else
+         n:=strtran(n,chr(0),"")
+      end
+      fwrite(1,n)
+   end 
 return .T.
 
 function funnext(pila,par,ITERACION)   // NEXT
@@ -3306,7 +3519,7 @@ local tmpPar               //? "PASA"
       end
    else
       _ERROR("LA MONA DICE: NEXT SOLO SE PUEDE USAR CON LECTURA DE ARCHIVO")
-      RETURN .F.                  
+      RETURN .F.
    end
 return .T.
 
@@ -3670,6 +3883,10 @@ LOCAL n,vn
      RETURN .F.
   end
   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN ~(EXPR) (NOT)")
+      RETURN .F.
+   end
   if vn=="N"
      if n!=0
         AADD(pila,0)
@@ -3703,54 +3920,72 @@ return .T.
    }
 } */
 
-function funmov(pila, VARTABLE)
-LOCAL o,n
+function funmov(pila)
+LOCAL o,n,vo
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o)  //n==NIL .or. o==NIL
      _ERROR("LA MONA DICE: @N RECIBE UN VALOR NULO"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(o)!="N"
+//   vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN @N:NUM(VALOR)")
+      RETURN .F.
+   end
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
   if o>0 .and. o<=SIZEVAR
      VARTABLE[o]:=n
   else
-     _ERROR("LA MONA DICE: REGISTRO "+HB_NTOS(o)+" NO EXISTE MOV(<<1.."+hb_ntos(SIZEVAR)+">>,...) L:"+hb_ntos(i) )
+     _ERROR("LA MONA DICE: REGISTRO "+HB_NTOS(o)+" NO EXISTE MOV(<<1.."+hb_ntos(SIZEVAR)+">>,VALOR) L:"+hb_ntos(i) )
      return .F.
   end
 return .T.
 
-function funvar(pila, VARTABLE)
-local o
+function funvar(pila)
+local o,vo
   o:=SDP(pila)
   if esnulo(o)   //o==NIL
      _ERROR("LA MONA DICE: VALOR NULO EN '@N'"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(o)!="N"
+
+   vo:=valtype(o)
+   if esarray(vo)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN @N:NUM")
+      RETURN .F.
+   end
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
   if o>=1 .and. o<=20
      aadd(PILA,VARTABLE[o])
   else
-     _ERROR("LA MONA DICE: REGISTRO "+HB_NTOS(o)+" NO EXISTE @(<<1..N>>) L:"+hb_ntos(i) )
+     _ERROR("LA MONA DICE: REGISTRO "+HB_NTOS(o)+" NO EXISTE @<<1..N>>:NUM" )
      return .F.
   end
 return .T.
 
 function funjnz(pila,p,i,LENP)
-LOCAL n,pilaif:={}
+LOCAL n,pilaif:={},vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
      _ERROR("LA MONA DICE: VALOR NULO EN '?'"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
+   vn:=valtype(n)
+   ///vo:=valtype(o)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN '?'")
+      RETURN .F.
+   end
   if n!=NIL
-     if valtype(n)=="N"
+     if vn=="N"
         n:=hb_ntos(n)
      else
         n:=strtran(n,chr(0),"")
@@ -3848,18 +4083,24 @@ function funpool(pila,JMP,LENJMP,LENP,i)
 return .T.
             
 function funround(pila,JMP,LENJMP,LENP,i)
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN ROUND"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN ROUND(X:NUM,Y:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(o)!="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vn,vo)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN ROUND(X:NUM,Y:NUM)")
+      RETURN .F.
+   end
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
-  if valtype(n)!="N"
+  if vn!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
   end
@@ -3867,13 +4108,20 @@ LOCAL o,n
 return .T.
        
 function funloop(pila,JMP,LENJMP,LENP,i)
+local n,vn
   if LENJMP>0
      n:=SDP(pila)
      if esnulo(n)   //n==NIL
-        _ERROR("LA MONA DICE: VALOR NULO EN PUNTERO A DIRECCION LOOP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+        _ERROR("LA MONA DICE: VALOR NULO EN PUNTERO A DIRECCION UNTIL(EXPR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
         RETURN .F.
      end
-     if valtype(n)!="N"
+     vn:=valtype(n)
+    // vo:=valtype(o)
+     if esarray(vn)
+        _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN UNTIL(EXPR)")
+        RETURN .F.
+     end
+     if vn!="N"
         n:=strtran(n,chr(0),"")
         n:=val(n)
      end
@@ -3885,19 +4133,25 @@ function funloop(pila,JMP,LENJMP,LENP,i)
         i:=JMP[LENJMP]
      end
   else
-     _ERROR("LA MONA DICE: LOOP sin POOL") 
+     _ERROR("LA MONA DICE: UNTIL SIN DO") 
      return .F.
   end
 return .T.
 
 function funutf8(pila,JMP,LENJMP,LENP,i)   
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN UTF8"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN UTF8(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+  vn:=valtype(n)
+//   vo:=valtype(o)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN UTF8(X:STR)")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"") 
@@ -3907,13 +4161,19 @@ LOCAL n
 return .T.
 
 function funansi(pila,JMP,LENJMP,LENP,i)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN ANSI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN ANSI(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+  vn:=valtype(n)
+//   vo:=valtype(o)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN ANSI(X:STR)")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -3923,19 +4183,25 @@ LOCAL n
 return .T.
 
 function funcat(pila)
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
      _ERROR("LA MONA DICE: VALOR NULO EN CAT '{}'"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+  vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN CAT(VALOR,VALOR)")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -3951,19 +4217,25 @@ LOCAL o,n
 return .T.
 
 function funmatch(pila)
-LOCAL o,n,xvar,j,id,c3,ids
+LOCAL o,n,xvar,j,id,c3,ids,vn,vo
   n:=SDP(pila)  // palabras a buscar
   o:=SDP(pila)  // variable: debe ser string
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN MATCH"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN MATCH(X:STR,Y:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(o)=="N"
+  vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN MATCH(X:STR,Y:STR)")
+      RETURN .F.
+   end
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -3990,13 +4262,19 @@ LOCAL o,n,xvar,j,id,c3,ids
 return .T.
 
 function funlenstr(pila)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN LEN"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN LEN(VALOR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+  vn:=valtype(n)
+//   vo:=valtype(o)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN LEN(VALOR)")
+      RETURN .F.
+   end
+  if vn=="N"
      AADD(pila,len(alltrim(str((n)))))
   else
      n:=strtran(n,chr(0),"")
@@ -4005,23 +4283,30 @@ LOCAL n
 return .T.
 
 function funsub(pila)
-LOCAL m,n,o
+LOCAL m,n,o,vn,vm,vo
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN SUB"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN SUB(X:STR,Y:NUM,Z:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(m)!="N"
+  vn:=valtype(n)
+   vo:=valtype(o)
+   vm:=valtype(m)
+   if esarray(vo,vn,vm)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN SUB(X:STR,Y:NUM,Z:NUM)")
+      RETURN .F.
+   end
+  if vm!="N"
      m:=strtran(m,chr(0),"")
      m:=val(m)
   end
-  if valtype(n)!="N"
+  if vn!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4035,19 +4320,25 @@ LOCAL m,n,o
 return .T.
 
 function funat(pila)
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN AT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN AT(X:STR,Y:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+  vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN AT(X:STR,Y:STR)")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4060,23 +4351,30 @@ LOCAL o,n
 return .T.
 
 function funrange(pila)
-LOCAL o,n,h
+LOCAL o,n,h,vo,vn,vh
   o:=SDP(pila)
   n:=SDP(pila)
   h:=SDP(pila)
   if esnulo(n,o,h)   //n==NIL.or.o==NIL.or.h==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN RANGE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN RANGE(X:STR,Y:NUM-CHAR,Z:NUM-CHAR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(h)=="N"
+  vn:=valtype(n)
+   vo:=valtype(o)
+   vh:=valtype(h)
+   if esarray(vo,vn,vh)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN RANGE(X:STR,Y:NUM-CHAR,Z:NUM-CHAR)")
+      RETURN .F.
+   end
+  if vh=="N"
      h:=hb_ntos(h)
   end
   h:=strtran(h,chr(0),"")
-  if valtype(n)!="N"
+  if vn!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
   end
-  if valtype(o)!="N"
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
@@ -4084,24 +4382,32 @@ LOCAL o,n,h
 return .T.
 
 function funat1(pila)
-LOCAL x,o,n,y
+LOCAL x,o,n,y,vx,vo,vn
   x:=SDP(pila)  // ocurrencia
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o,x)   //n==NIL.or.o==NIL.or.x==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN ATA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN ATA(X:STR,Y:STR,Z:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(x)!="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   vx:=valtype(x)
+   if esarray(vo,vn,vx)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN ATA(X:STR,Y:STR,Z:NUM)")
+      RETURN .F.
+   end
+
+  if vx!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4114,19 +4420,26 @@ LOCAL x,o,n,y
 return .T.
 
 function funaf(pila)
-LOCAL n,o,j,id,ids,sw:=.F.
+LOCAL n,o,j,id,ids,sw:=.F.,vn,vo
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN AF"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN AF(X:STR,Y:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+     vn:=valtype(n)
+   vo:=valtype(o)
+
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN AF(X:STR,Y:STR)")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4160,19 +4473,25 @@ LOCAL n,o,j,id,ids,sw:=.F.
 return .T.
 
 function funrat(pila)
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN RAT"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN RAT(X:STR,Y:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN RAT(X:STR,Y:STR)")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4185,19 +4504,25 @@ LOCAL o,n
 return .T.
 
 function funptrp()
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN PTRP {+S}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN PTRP(X:STR,Y:NUM) O {+Y:NUM}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN PTRP(X:STR,Y:NUM) O {+Y:NUM}")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)!="N"
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
@@ -4205,19 +4530,25 @@ LOCAL o,n
 return .T.
 
 function funptrm(pila)
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN PTRM {-S}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN PTRM(X:STR,Y:NUM) O {-Y:NUM}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN PTRM(X:STR,Y:NUM) O {-Y:NUM}")
+      RETURN .F.
+   end
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)!="N"
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
@@ -4226,18 +4557,25 @@ LOCAL o,n
 return .T.
 
 function funcp(pila)
-LOCAL o,n
+LOCAL o,n,vn,vo
   o:=SDP(pila)
   n:=SDP(pila)
   if esnulo(n,o)   //n==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN CP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN CP(X:STR,Y:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(o)!="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   if esarray(vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN CP(X:STR,Y:NUM)")
+      RETURN .F.
+   end
+
+  if vo!="N"
      o:=strtran(o,chr(0),"")
      o:=val(o)
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -4247,25 +4585,33 @@ LOCAL o,n
 return .T.
 
 function funtr(pila)
-LOCAL m,n,o
+LOCAL m,n,o,vm,vn,vo
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TR"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TR(X:STR,Y:STR,Z:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(m)=="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   vm:=valtype(m)
+   if esarray(vo,vn,vm)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TR(X:STR,Y:STR,Z:STR)")
+      RETURN .F.
+   end
+
+  if vm=="N"
      m:=hb_ntos(m)
   else
     m:=strtran(m,chr(0),"")   
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
     n:=strtran(n,chr(0),"")   
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
     o:=strtran(o,chr(0),"")   
@@ -4274,39 +4620,45 @@ LOCAL m,n,o
 return .T.
 
 function funtr1(pila)
-LOCAL x,h,m,n,o
+LOCAL x,h,m,n,o,vx,vh,vm,vn,vo
   x:=SDP(pila)  // omite y reemplaza
   h:=SDP(pila)  // omite
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m,h,x)   //n==NIL.or.o==NIL.or.x==NIL.or.h==NIL.or.m==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TRA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TRA(X:STR,Y:STR,Z:STR,N:NUM,M:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(h)!="N"
-        h:=strtran(h,chr(0),"")
-        h:=val(h)
-  end
-  if valtype(x)!="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   vm:=valtype(m)
+   vx:=valtype(x)
+   vh:=valtype(h)
+   if esarray(vo,vn,vm,vh,vx)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TRA(X:STR,Y:STR,Z:STR,N:NUM,M:NUM)")
+      RETURN .F.
+   end
+
+  if vx!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
   end
-  if valtype(h)!="N"
+  if vh!="N"
      h:=strtran(h,chr(0),"")
      h:=val(h)
   end
-  if valtype(m)=="N"
+  if vm=="N"
      m:=hb_ntos(m)
   else
      m:=strtran(m,chr(0),"")
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4315,30 +4667,39 @@ LOCAL x,h,m,n,o
 return .T.
 
 function funtr2(pila)
-LOCAL h,m,n,o
+LOCAL h,m,n,o,vn,vo,vh,vm
   h:=SDP(pila)  // omite
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TRB"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TRB(X:STR,Y:STR,Z:STR,N:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(h)!="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   vm:=valtype(m)
+   vh:=valtype(h)
+   if esarray(vo,vn,vm,vh)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TRB(X:STR,Y:STR,Z:STR,N:NUM)")
+      RETURN .F.
+   end
+
+  if vh!="N"
         h:=strtran(h,chr(0),"")
         h:=val(h)
   end
-  if valtype(m)=="N"
+  if vm=="N"
      m:=hb_ntos(m)
   else
      m:=strtran(m,chr(0),"")
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")   
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4347,24 +4708,32 @@ LOCAL h,m,n,o
 return .T.
 
 function funaf1(pila)
-LOCAL x,n,o,id,ids,j,y,sw:=.F.
+LOCAL x,n,o,id,ids,j,y,sw:=.F.,vx,vn,vo
   x:=SDP(pila)  // ocurrencia
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,x)   //n==NIL.or.o==NIL.or.x==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN AFA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN AFA(X:STR,Y:STR,N:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(x)!="N"
+   vn:=valtype(n)
+   vo:=valtype(o)
+   vx:=valtype(x)
+   if esarray(vo,vn,vx)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN AFA(X:STR,Y:STR,N:NUM)")
+      RETURN .F.
+   end
+
+  if vx!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4408,18 +4777,25 @@ LOCAL x,n,o,id,ids,j,y,sw:=.F.
 return .T.
 
 function funtk(pila,tBUFFER)
-LOCAL m,o,n
+LOCAL m,o,n,vm,vo
   m:=SDP(pila)
   o:=SDP(pila)
   if esnulo(m,o)   //m==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TK $N"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TK(X:STR,N:NUM) O $N:NUM"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(m)!="N"
+   vm:=valtype(m)
+   vo:=valtype(o)
+   if esarray(vm,vo)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TK(X:STR,N:NUM) O $N:NUM")
+      RETURN .F.
+   end
+
+  if vm!="N"
      m:=strtran(m,chr(0),"")
      m:=val(m)
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4451,19 +4827,26 @@ LOCAL m,o,n
 return .T.
 
 function funlet(pila,tBUFFER)
-LOCAL h,o
+LOCAL h,o,vh,vo
   h:=SDP(pila)  // string.
   o:=SDP(pila)  // linea.debe ser un número
   if esnulo(h,o)   //h==NIL.or.o==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN LET"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN LET(N:NUM,VALOR) O #N:NUM(VALOR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(h)=="N"
+   vh:=valtype(h)
+   vo:=valtype(o)
+   if esarray(vh,vo)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN LET(N:NUM,VALOR) O #N:NUM(VALOR)")
+      RETURN .F.
+   end
+
+  if vh=="N"
      h:=hb_ntos(h)
   else
      h:=strtran(h,chr(0),"")
   end
-  if valtype(o)!="N"
+  if vo!="N"
 //    ? "O=",o
      o:=strtran(o,chr(0),"")
      o:=val(o)
@@ -4478,15 +4861,23 @@ LOCAL h,o
 return .T.
 
 function funletk(pila,tBUFFER)
-LOCAL h,o,n,c1,c2,j,str,xvar
+LOCAL h,o,n,c1,c2,j,str,xvar,vh,vn,vo
   h:=SDP(pila)  // token 2. puede ser un string.
   n:=SDP(pila)  // token 1. debe ser un numero, indice de token
   o:=SDP(pila)  // linea
   if esnulo(n,o,h)   //n==NIL.or.o==NIL.or.h==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TKLET"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TKLET(X:STR,N:NUM,M:NUM|STR) O $N:NUM(VALOR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)!="N"
+   vh:=valtype(h)
+   vo:=valtype(o)
+   vn:=valtype(n)
+   if esarray(vh,vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TKLET(X:STR,N:NUM,M:NUM|STR) O $N:NUM(VALOR)")
+      RETURN .F.
+   end
+
+  if vn!="N"
      n:=strtran(n,chr(0),"")
      n:=val(n)
   end
@@ -4495,7 +4886,7 @@ LOCAL h,o,n,c1,c2,j,str,xvar
      return .F.
   end
   o:=strtran(o,chr(0),"")
-  if valtype(h)=="N"  // intercambia tokens
+  if vh=="N"  // intercambia tokens
      c1:=alltrim(token(o,DEFTOKEN,n))
      c2:=alltrim(token(o,DEFTOKEN,h))
      j:=numtoken(o,DEFTOKEN)
@@ -4527,34 +4918,43 @@ LOCAL h,o,n,c1,c2,j,str,xvar
 return .T.
 
 function funcopy(pila,tBUFFER)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN COPY"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN COPY(VALOR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN COPY(VALOR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-/*  if n==NIL
-     _ERROR("LA MONA DICE: NO ENCUENTRO UN DATO VALIDO PARA COPIAR EN BUFFER <<COPY(null)>>")
-     RETURN .F.
-  else*/
+
   if len(n)>0 .and. n!="0"
      AADD(tBUFFER,alltrim(n))
   end
 return .T.
 
 function fungloss(pila,tBUFFER)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN GLOSS"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN GLOSS(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN GLOSS(X:STR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      IF ABS(n)>INFINITY().or. (ABS(n)>0.and.ABS(n)<0.000000000001)
         n:=D2E(n,10)
      else
@@ -4568,13 +4968,19 @@ LOCAL n
 return .T.
 
 function funtri(pila)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TRI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TRI(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TRI(X:STR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -4583,13 +4989,19 @@ LOCAL n
 return .T.
 
 function funltri(pila)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN LTRI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN LTRI(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN LTRI(X:STR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -4598,13 +5010,19 @@ LOCAL n
 return .T.
 
 function funrtri(pila)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN RTRI"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN RTRI(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN RTRI(X:STR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -4613,13 +5031,19 @@ LOCAL n
 return .T.
 
 function funup(pila)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN UP"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN UP(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN UP(X:STR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -4629,13 +5053,19 @@ LOCAL n
 return .T.
 
 function funlow(pila)
-LOCAL n
+LOCAL n,vn
   n:=SDP(pila)
   if esnulo(n)   //n==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN LOW"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN LOW(X:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(n)=="N"
+   vn:=valtype(n)
+   if esarray(vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN LOW(X:STR)")
+      RETURN .F.
+   end
+
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
@@ -4660,25 +5090,33 @@ LOCAL o,n
 return .T.*/
 
 function funtre(pila)
-LOCAL m,n,o,ids,id,j,c1,c2
+LOCAL m,n,o,ids,id,j,c1,c2,vn,vo,vm
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TRE"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TRE(X:STR,Y:STR,Z:STR)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(m)=="N"
+   vm:=valtype(m)
+   vo:=valtype(o)
+   vn:=valtype(n)
+   if esarray(vm,vo,vn)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TRE(X:STR,Y:STR,Z:STR)")
+      RETURN .F.
+   end
+
+  if vm=="N"
      m:=hb_ntos(m)
   else
      m:=strtran(m,chr(0),"")
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4702,30 +5140,39 @@ LOCAL m,n,o,ids,id,j,c1,c2
 return .T.
 
 function funtre2(pila)
-LOCAL h,m,n,o,id,ids,j,c1,c2
+LOCAL h,m,n,o,id,ids,j,c1,c2,vh,vm,vn,vo
   h:=SDP(pila)
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m,h)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TREB"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TREB(X:STR,Y:STR,Z:STR,N:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(h)!="N"
+   vh:=valtype(h)
+   vo:=valtype(o)
+   vn:=valtype(n)
+   vm:=valtype(m)
+   if esarray(vh,vo,vn,vm)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TREB(X:STR,Y:STR,Z:STR,N:NUM)")
+      RETURN .F.
+   end
+
+  if vh!="N"
      h:=strtran(h,chr(0),"")
      h:=val(h)
   end
-  if valtype(m)=="N"
+  if vm=="N"
      m:=hb_ntos(m)
   else
      m:=strtran(m,chr(0),"")
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4760,35 +5207,45 @@ LOCAL h,m,n,o,id,ids,j,c1,c2
 return .T.
 
 function funtre1(pila)
-LOCAL x,k,h,m,n,o,id,ids,j,c1,c2
+LOCAL x,k,h,m,n,o,id,ids,j,c1,c2,vx,vh,vm,vn,vo
   x:=SDP(pila)
   h:=SDP(pila)
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m,h,x)   //n==NIL.or.o==NIL.or.m==NIL.or.h==NIL.or.x==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN TREA"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN TREA(X:STR,Y:STR,Z:STR,N:NUM,M:NUM)"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(x)!="N"
+   vh:=valtype(h)
+   vo:=valtype(o)
+   vn:=valtype(n)
+   vm:=valtype(m)
+   vx:=valtype(x)
+   if esarray(vh,vo,vn,vm,vx)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN TREA(X:STR,Y:STR,Z:STR,N:NUM,M:NUM)")
+      RETURN .F.
+   end
+
+  if vx!="N"
      x:=strtran(x,chr(0),"")
      x:=val(x)
   end
-  if valtype(h)!="N"
+  if vh!="N"
      h:=strtran(h,chr(0),"")
      h:=val(h)
   end
-  if valtype(m)=="N"
+  if vm=="N"
      m:=hb_ntos(m)
   else
      m:=strtran(m,chr(0),"")
   end
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4831,24 +5288,32 @@ LOCAL x,k,h,m,n,o,id,ids,j,c1,c2
 return .T.
 
 function funins(pila)
-LOCAL m,n,o,xvar
+LOCAL m,n,o,xvar,vm,vn,vo
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN INS"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN INS(X:STR,Y:STR,N:NUM) O INS{Y:STR,N:NUM}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(m)!="N"
+   vo:=valtype(o)
+   vn:=valtype(n)
+   vm:=valtype(m)
+   if esarray(vo,vn,vm)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN INS(X:STR,Y:STR,N:NUM) O INS{Y:STR,N:NUM}")
+      RETURN .F.
+   end
+
+  if vm!="N"
      m:=strtran(m,chr(0),"")
      m:=val(m)
   end 
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
      n:=strtran(n,chr(0),"")
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
      o:=strtran(o,chr(0),"")
@@ -4864,25 +5329,33 @@ LOCAL m,n,o,xvar
 return .T.
 
 function funrpc(pila)
-LOCAL m,n,o
+LOCAL m,n,o,vn,vm,vo
   m:=SDP(pila)
   n:=SDP(pila)
   o:=SDP(pila)
   if esnulo(n,o,m)   //n==NIL.or.o==NIL.or.m==NIL
-     _ERROR("LA MONA DICE: VALOR NULO EN RPC"+_CR+"Quizas no encerraste una expresión entre paréntesis")
+     _ERROR("LA MONA DICE: VALOR NULO EN RPC(X:STR,Y:STR,Z:STR) O RPC{Y:STR,Z:STR}"+_CR+"Quizas no encerraste una expresión entre paréntesis")
      RETURN .F.
   end
-  if valtype(m)=="N"
+   vo:=valtype(o)
+   vn:=valtype(n)
+   vm:=valtype(m)
+   if esarray(vo,vn,vm)
+      _ERROR("LA MONA DICE: UN ARRAY SIN INDIZAR EN RPC(X:STR,Y:STR,Z:STR) O RPC{Y:STR,Z:STR}")
+      RETURN .F.
+   end
+
+  if vm=="N"
      m:=hb_ntos(m)
   else
     m:=strtran(m,chr(0),"")   
   end 
-  if valtype(n)=="N"
+  if vn=="N"
      n:=hb_ntos(n)
   else
     n:=strtran(n,chr(0),"")   
   end
-  if valtype(o)=="N"
+  if vo=="N"
      o:=hb_ntos(o)
   else
     o:=strtran(o,chr(0),"")   
@@ -5728,8 +6201,8 @@ DICC:={"NT","I","VAR","MOV","~","L",;   // A 1-6
        "NOT","BIT","ON","OFF","BIN","HEX","DEC","OCT",; // L  71-78
        "LN","LOG","SQRT","ABS","INT","CEIL","EXP","NL",;  // M  79-85
        "FLOOR","SGN","SIN","COS","TAN","INV","NEXT",;
-       "BACK","TPC","HT","VT","EOF","ENV","SAY"}   //N  86-91 (inv)
-                             
+       "BACK","TPC","HT","VT","EOF","ENV","SAY","PUTL","GETL","LOAD"}   //N  86-91 (inv)
+
 //long:=len(DICC)
 //_pos:=Ascan(DICC, arg)
 //for i:=1 to long
@@ -6201,6 +6674,27 @@ HB_FUNC( ISANY )
       hb_itemClear( pVAR );
    }
    hb_retl( bGood );
+}
+
+HB_FUNC( ESARRAY )
+{
+   int iPCount = hb_pcount();
+
+   HB_BOOL bError = HB_FALSE;
+   if( iPCount > 0 )
+   {
+      
+      int iParam;
+      for( iParam = 1; iParam <= iPCount; iParam++ )
+      {
+         if( HB_ISARRAY( iParam ) )
+         {
+            bError = HB_TRUE;
+            break;
+         }
+      }
+   }
+   hb_retl( bError );
 }
 
 HB_FUNC( ESNULO )
@@ -7051,6 +7545,41 @@ HB_FUNC( ISNOTATION )  // esto debe ir!! llevar otros codigos semejante a "C"
   hb_retnint(retorne);
 }
 
+HB_FUNC( GETFLINEAS )  // obtiene lineas de LOAD
+{
+   PHB_ITEM pSTRING = hb_param( 1, HB_IT_STRING );
+   unsigned int numLin = hb_parni( 2 );
+
+   const char * STRING = hb_itemGetCPtr( pSTRING );
+   unsigned long i=0,nLin=1;
+
+   PHB_ITEM pCWM = hb_itemArrayNew( numLin ); // CWM
+   
+   while (*STRING){
+      // busca numero de linea
+      char * buffer = (char *)calloc(1024,1);
+      i=0;
+      while(*STRING!='\n'){
+         buffer[i] = *STRING;
+         ++STRING;    // avanzo un caracter.
+         ++i;
+      }
+      ++STRING;  // omite '\n'
+      buffer[i]='\0';
+      const char * pBuffer = buffer;
+     // PHB_ITEM pC  = hb_itemArrayNew( 1 );
+
+      hb_arraySetC( pCWM, nLin++, (const char *) pBuffer );
+     // hb_arrayAdd( pCWM, pC );
+     // hb_itemRelease(pC);
+      free(buffer);
+   }
+   hb_itemClear( pSTRING );
+   hb_itemReturnRelease( pCWM );
+
+//   printf("\nnTotal=%ld\n",nTotal);
+}
+
 HB_FUNC( GETLINEAS )
 {
    PHB_ITEM pSTRING = hb_param( 1, HB_IT_STRING );
@@ -7182,7 +7711,7 @@ HB_FUNC( GETINITFILE )
    fseek(fp,SEEK_CUR,);
    fclose(fp);
 }*/
-/*HB_FUNC( CUENTALINEAS )
+HB_FUNC( CUENTALINEAS )
 {
    const char * pFile = hb_parc( 1 );
 
@@ -7220,7 +7749,7 @@ HB_FUNC( GETINITFILE )
    hb_arraySetNL( pCWM, 2, (long) nTotCar );
    hb_arraySetNL( pCWM, 3, (long) noldLong );
    hb_itemReturnRelease( pCWM );
-} */
+}
 /*
 HB_FUNC( SPCUENTALINEAS )
 {

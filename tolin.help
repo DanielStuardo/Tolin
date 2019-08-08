@@ -161,7 +161,7 @@ Modo de uso:
                    
                    EXCEPCIONES: el comando CLEAR, en Tolin, limpia el BUFFER. Además, los comandos SAVE y LOAD
                    no tienen uso con Tolin, y el comando FILE, que devuelve el nombre del archivo procesado,
-                   no existe en Edit4XU.
+                   no existe en Laica.
 
   OBSERVACIONES.
 
@@ -1150,6 +1150,9 @@ UN POCO DE HISTORIA...
                      una función, pero solo cuando esta coincide con el fin de
                      la ejecución del script, igual que AWK. Si quiere desplegar
                      algo entremedio, use SAY.
+
+     >>IMPORTANTE>>  SAY despliega todo lo que encuentre en la pila.
+      
                      Ejemplo:
                      Aquí no tiene sentido usar SAY:
                        tolin -f file '{I," : "+#}'
